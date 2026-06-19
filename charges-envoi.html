@@ -219,6 +219,43 @@ input[type="file"]{display:none}
     </div>
     <button class="btn btn-primary btn-sm" onclick="ouvrirAjoutLocataire()">+ Ajouter</button>
   </div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">Import depuis Excel</div>
+    <div class="field">
+      <label>Immeuble concerné par l'Excel</label>
+      <select id="excel-immeuble">
+        <option value="Biche">Biche</option>
+        <option value="Nimy">Nimy</option>
+        <option value="PTG">Petite Guirlande</option>
+        <option value="tous">Tous (colonne immeuble dans Excel)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Colonne Unité (A, B, C...)</label>
+      <input type="text" id="excel-col-unite" value="A" maxlength="2" style="text-transform:uppercase"/>
+    </div>
+    <div class="field">
+      <label>Colonne Nom Prénom</label>
+      <input type="text" id="excel-col-nom" value="B" maxlength="2" style="text-transform:uppercase"/>
+    </div>
+    <div class="field">
+      <label>Colonne Email locataire</label>
+      <input type="text" id="excel-col-email" value="C" maxlength="2" style="text-transform:uppercase"/>
+    </div>
+    <div class="field">
+      <label>Colonne Email garant (optionnel)</label>
+      <input type="text" id="excel-col-garant" value="D" maxlength="2" style="text-transform:uppercase"/>
+    </div>
+    <div class="field">
+      <label>Ligne de départ (après en-têtes)</label>
+      <input type="number" id="excel-row-start" value="2" min="1"/>
+    </div>
+    <button class="btn btn-primary" onclick="document.getElementById('input-excel').click()">
+      📊 Importer fichier Excel
+    </button>
+    <input type="file" id="input-excel" accept=".xlsx,.xls" onchange="importerExcel(this)"/>
+    <div id="excel-status" style="margin-top:8px"></div>
+  </div>
   <div id="liste-locataires"></div>
 </div>
 
@@ -285,8 +322,12 @@ input[type="file"]{display:none}
       <input type="text" id="m-nom" placeholder="DUPONT Jean"/>
     </div>
     <div class="field">
-      <label>Email</label>
+      <label>Email locataire</label>
       <input type="email" id="m-email" placeholder="locataire@email.com"/>
+    </div>
+    <div class="field">
+      <label>Email garant (optionnel)</label>
+      <input type="email" id="m-email-garant" placeholder="garant@email.com"/>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn btn-secondary" style="flex:1" onclick="fermerModal('modal-loc')">Annuler</button>
@@ -326,42 +367,42 @@ const ANNEES = ['2024-2025','2025-2026','2026-2027'];
 // LOCATAIRES PAR DÉFAUT
 // ============================================================
 const LOCATAIRES_DEFAUT = [
-  {id:"1",immeuble:"Nimy",apt:"RDC",nom:"Caroline THEYS",email:"jemagerard@gmail.com"},
-  {id:"2",immeuble:"Nimy",apt:"Studio 1",nom:"Cyril MESSE",email:"jemagerard@gmail.com"},
-  {id:"3",immeuble:"Nimy",apt:"Studio 2",nom:"Safiya BACHIRI",email:"jemagerard@gmail.com"},
-  {id:"4",immeuble:"Nimy",apt:"Studio 3",nom:"Déborah SNAUWAERT",email:"jemagerard@gmail.com"},
-  {id:"5",immeuble:"Nimy",apt:"Studio 4",nom:"Maxence SAUCIN",email:"jemagerard@gmail.com"},
-  {id:"6",immeuble:"Nimy",apt:"Studio 5",nom:"Kawtar MARZAQ",email:"jemagerard@gmail.com"},
-  {id:"7",immeuble:"Nimy",apt:"Studio 6",nom:"Zachari CALISTRI",email:"jemagerard@gmail.com"},
-  {id:"8",immeuble:"Nimy",apt:"Studio 7",nom:"DELLA Giustina Loris",email:"jemagerard@gmail.com"},
-  {id:"9",immeuble:"Nimy",apt:"Studio 8",nom:"Charlotte DE SAINTE",email:"jemagerard@gmail.com"},
-  {id:"10",immeuble:"Nimy",apt:"Studio 9",nom:"Anastasia KOZLENKO",email:"jemagerard@gmail.com"},
-  {id:"11",immeuble:"Nimy",apt:"Studio 10",nom:"Souleiman HODO",email:"jemagerard@gmail.com"},
-  {id:"12",immeuble:"Nimy",apt:"Studio 11",nom:"Nell GEERAERTS",email:"jemagerard@gmail.com"},
-  {id:"13",immeuble:"PTG",apt:"Appart 1er",nom:"Adeline DEVOS",email:"jemagerard@gmail.com"},
-  {id:"14",immeuble:"PTG",apt:"Duplex",nom:"ZUFFANTI Léna & BERTE Matis & DELBOUILLE Jean",email:"jemagerard@gmail.com"},
-  {id:"15",immeuble:"PTG",apt:"Appart 3",nom:"Maxime NOVAS & Maxime NACHBAURER",email:"jemagerard@gmail.com"},
-  {id:"16",immeuble:"PTG",apt:"Studio 4",nom:"Jordan SCHOONHEERE",email:"jemagerard@gmail.com"},
-  {id:"17",immeuble:"PTG",apt:"Studio 5",nom:"Damien CZAJA",email:"jemagerard@gmail.com"},
-  {id:"18",immeuble:"PTG",apt:"Studio 6",nom:"Emma DUCHATEAU",email:"jemagerard@gmail.com"},
-  {id:"19",immeuble:"PTG",apt:"Studio 7",nom:"DELMOTE Ema",email:"jemagerard@gmail.com"},
-  {id:"20",immeuble:"PTG",apt:"Studio 8",nom:"Vincent ISTASSE",email:"jemagerard@gmail.com"},
-  {id:"21",immeuble:"PTG",apt:"Studio 9",nom:"HIFOUF Hayat",email:"jemagerard@gmail.com"},
-  {id:"22",immeuble:"PTG",apt:"Studio 10",nom:"Laura WILLAM",email:"jemagerard@gmail.com"},
-  {id:"23",immeuble:"PTG",apt:"RDC Commercial",nom:"All4Invest",email:"jemagerard@gmail.com"},
-  {id:"24",immeuble:"PTG",apt:"RDC Arrière",nom:"Frans DELISSE",email:"jemagerard@gmail.com"},
-  {id:"25",immeuble:"Biche",apt:"Appart",nom:"Shanell TORABI",email:"jemagerard@gmail.com"},
-  {id:"26",immeuble:"Biche",apt:"Studio 1",nom:"Manon BRESSAN",email:"jemagerard@gmail.com"},
-  {id:"27",immeuble:"Biche",apt:"Studio 2",nom:"Lise HARDI",email:"jemagerard@gmail.com"},
-  {id:"28",immeuble:"Biche",apt:"Studio 3",nom:"Matteo CESARO",email:"jemagerard@gmail.com"},
-  {id:"29",immeuble:"Biche",apt:"Studio 4",nom:"Emmanuelle MICHAUX",email:"jemagerard@gmail.com"},
-  {id:"30",immeuble:"Biche",apt:"Studio 5",nom:"Laurent DECLERCQ-BISCO",email:"jemagerard@gmail.com"},
-  {id:"31",immeuble:"Biche",apt:"Studio 6",nom:"Jules AMOURI",email:"jemagerard@gmail.com"},
-  {id:"32",immeuble:"Biche",apt:"Studio 7",nom:"Lucie CRANSQUINT",email:"jemagerard@gmail.com"},
-  {id:"33",immeuble:"Biche",apt:"Studio 8",nom:"Axel ALVES GOMES",email:"jemagerard@gmail.com"},
-  {id:"34",immeuble:"Biche",apt:"Studio 9",nom:"Théo PASCALI",email:"jemagerard@gmail.com"},
-  {id:"35",immeuble:"Biche",apt:"Studio 10",nom:"Lorna COSTER",email:"jemagerard@gmail.com"},
-  {id:"36",immeuble:"Biche",apt:"Studio 11",nom:"Valentine DEGROOTE",email:"jemagerard@gmail.com"}
+  {id:"1",immeuble:"Nimy",apt:"RDC",nom:"Caroline THEYS",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"2",immeuble:"Nimy",apt:"Studio 1",nom:"Cyril MESSE",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"3",immeuble:"Nimy",apt:"Studio 2",nom:"Safiya BACHIRI",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"4",immeuble:"Nimy",apt:"Studio 3",nom:"Déborah SNAUWAERT",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"5",immeuble:"Nimy",apt:"Studio 4",nom:"Maxence SAUCIN",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"6",immeuble:"Nimy",apt:"Studio 5",nom:"Kawtar MARZAQ",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"7",immeuble:"Nimy",apt:"Studio 6",nom:"Zachari CALISTRI",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"8",immeuble:"Nimy",apt:"Studio 7",nom:"DELLA Giustina Loris",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"9",immeuble:"Nimy",apt:"Studio 8",nom:"Charlotte DE SAINTE",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"10",immeuble:"Nimy",apt:"Studio 9",nom:"Anastasia KOZLENKO",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"11",immeuble:"Nimy",apt:"Studio 10",nom:"Souleiman HODO",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"12",immeuble:"Nimy",apt:"Studio 11",nom:"Nell GEERAERTS",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"13",immeuble:"PTG",apt:"Appart 1er",nom:"Adeline DEVOS",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"14",immeuble:"PTG",apt:"Duplex",nom:"ZUFFANTI Léna & BERTE Matis & DELBOUILLE Jean",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"15",immeuble:"PTG",apt:"Appart 3",nom:"Maxime NOVAS & Maxime NACHBAURER",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"16",immeuble:"PTG",apt:"Studio 4",nom:"Jordan SCHOONHEERE",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"17",immeuble:"PTG",apt:"Studio 5",nom:"Damien CZAJA",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"18",immeuble:"PTG",apt:"Studio 6",nom:"Emma DUCHATEAU",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"19",immeuble:"PTG",apt:"Studio 7",nom:"DELMOTE Ema",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"20",immeuble:"PTG",apt:"Studio 8",nom:"Vincent ISTASSE",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"21",immeuble:"PTG",apt:"Studio 9",nom:"HIFOUF Hayat",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"22",immeuble:"PTG",apt:"Studio 10",nom:"Laura WILLAM",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"23",immeuble:"PTG",apt:"RDC Commercial",nom:"All4Invest",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"24",immeuble:"PTG",apt:"RDC Arrière",nom:"Frans DELISSE",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"25",immeuble:"Biche",apt:"Appart",nom:"Shanell TORABI",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"26",immeuble:"Biche",apt:"Studio 1",nom:"Manon BRESSAN",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"27",immeuble:"Biche",apt:"Studio 2",nom:"Lise HARDI",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"28",immeuble:"Biche",apt:"Studio 3",nom:"Matteo CESARO",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"29",immeuble:"Biche",apt:"Studio 4",nom:"Emmanuelle MICHAUX",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"30",immeuble:"Biche",apt:"Studio 5",nom:"Laurent DECLERCQ-BISCO",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"31",immeuble:"Biche",apt:"Studio 6",nom:"Jules AMOURI",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"32",immeuble:"Biche",apt:"Studio 7",nom:"Lucie CRANSQUINT",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"33",immeuble:"Biche",apt:"Studio 8",nom:"Axel ALVES GOMES",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"34",immeuble:"Biche",apt:"Studio 9",nom:"Théo PASCALI",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"35",immeuble:"Biche",apt:"Studio 10",nom:"Lorna COSTER",email:"jemagerard@gmail.com",emailGarant:""},
+  {id:"36",immeuble:"Biche",apt:"Studio 11",nom:"Valentine DEGROOTE",email:"jemagerard@gmail.com",emailGarant:""}
 ];
 
 // ============================================================
@@ -495,7 +536,11 @@ function onLocataireChange() {
   if (state.selectedLocataire) {
     zone.style.display = 'block';
     if (state.selectedLocataire.email) {
-      st.className = 'status ok'; st.textContent = '✉️ ' + state.selectedLocataire.email;
+      let emailInfo = '✉️ ' + state.selectedLocataire.email;
+      if (state.selectedLocataire.emailGarant) {
+        emailInfo += ' + ' + state.selectedLocataire.emailGarant + ' (garant)';
+      }
+      st.className = 'status ok'; st.textContent = emailInfo;
     } else {
       st.className = 'status warn'; st.textContent = '⚠️ Email manquant — modifier dans Locataires';
     }
@@ -518,7 +563,7 @@ function renderLocataires() {
     <div class="loc-item ${l.email?'has-email':''}" onclick="editerLocataire('${l.id}')">
       <div style="flex:1">
         <div class="loc-name">${l.nom}</div>
-        <div class="loc-sub">${l.email||'⚠️ Email manquant'}</div>
+        <div class="loc-sub">${l.email||'⚠️ Email manquant'}${l.emailGarant?' · '+l.emailGarant+' (garant)':''}</div>
       </div>
       <div class="loc-apt">${l.apt}</div>
     </div>`).join('');
@@ -531,6 +576,7 @@ function ouvrirAjoutLocataire() {
   document.getElementById('m-apt').value = '';
   document.getElementById('m-nom').value = '';
   document.getElementById('m-email').value = '';
+  document.getElementById('m-email-garant').value = '';
   document.getElementById('btn-suppr-loc').style.display = 'none';
   ouvrirModal('modal-loc');
 }
@@ -544,6 +590,7 @@ function editerLocataire(id) {
   document.getElementById('m-apt').value = loc.apt;
   document.getElementById('m-nom').value = loc.nom;
   document.getElementById('m-email').value = loc.email||'';
+  document.getElementById('m-email-garant').value = loc.emailGarant||'';
   document.getElementById('btn-suppr-loc').style.display = 'block';
   ouvrirModal('modal-loc');
 }
@@ -553,12 +600,13 @@ function sauvegarderLocataire() {
   const apt = document.getElementById('m-apt').value.trim();
   const nom = document.getElementById('m-nom').value.trim();
   const email = document.getElementById('m-email').value.trim();
+  const emailGarant = document.getElementById('m-email-garant').value.trim();
   if (!apt||!nom) { alert('Appartement et nom obligatoires'); return; }
   if (state.editingLocId) {
     const idx = state.locataires.findIndex(l => l.id === state.editingLocId);
-    if (idx >= 0) state.locataires[idx] = {...state.locataires[idx],immeuble:imm,apt,nom,email};
+    if (idx >= 0) state.locataires[idx] = {...state.locataires[idx],immeuble:imm,apt,nom,email,emailGarant};
   } else {
-    state.locataires.push({id:Date.now().toString(),immeuble:imm,apt,nom,email});
+    state.locataires.push({id:Date.now().toString(),immeuble:imm,apt,nom,email,emailGarant});
   }
   sauvegarderDonnees(); fermerModal('modal-loc'); renderLocataires(); updateSelLocataire();
 }
@@ -871,128 +919,67 @@ async function envoyerMail() {
   const zone = document.getElementById('send-status-zone');
   const loc = state.selectedLocataire;
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Envoi en cours...';
+  btn.innerHTML = '<span class="spinner"></span> Préparation...';
   zone.innerHTML = '';
 
   try {
-    const wordB64 = await fileToBase64(state.wordFile);
-    const wordMime = state.wordFile.name.endsWith('.pdf') ? 'application/pdf' :
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const subject = document.getElementById('mail-objet').value;
+    const body = document.getElementById('mail-body').value;
 
-    const attachments = [{filename:state.wordFilename||state.wordFile.name, data:wordB64, mime:wordMime}];
+    // ÉTAPE 1 : Télécharger les pièces jointes sur l'iPhone
+    // L'utilisateur les retrouvera dans Fichiers pour les joindre dans Mail
+    
+    // Télécharger le Word
+    const wordUrl = URL.createObjectURL(state.wordFile);
+    const wordLink = document.createElement('a');
+    wordLink.href = wordUrl;
+    wordLink.download = state.wordFilename || state.wordFile.name;
+    wordLink.click();
+    URL.revokeObjectURL(wordUrl);
 
+    // Attendre un peu puis télécharger ISTA si PTG
     if (state.immeuble === 'PTG' && state.istaFile) {
-      const istaB64 = await blobToBase64(state.istaFile.blob);
-      attachments.push({filename:state.istaFile.filename, data:istaB64, mime:'application/pdf'});
+      await new Promise(r => setTimeout(r, 1500));
+      const istaUrl = URL.createObjectURL(state.istaFile.blob);
+      const istaLink = document.createElement('a');
+      istaLink.href = istaUrl;
+      istaLink.download = state.istaFile.filename;
+      istaLink.click();
+      URL.revokeObjectURL(istaUrl);
+      await new Promise(r => setTimeout(r, 1000));
     }
 
-    if (!window.Email) await loadScript('https://smtpjs.com/v3/smtp.js');
+    // ÉTAPE 2 : Ouvrir Mail avec destinataire, objet et corps pré-remplis
+    // Construire les destinataires (locataire + garant si présent)
+    const destinataires = loc.emailGarant 
+      ? loc.email + ',' + loc.emailGarant
+      : loc.email;
+    const mailtoUrl = 'mailto:' + encodeURIComponent(destinataires) +
+      '?subject=' + encodeURIComponent(subject) +
+      '&body=' + encodeURIComponent(body);
+    
+    window.location.href = mailtoUrl;
 
-    await new Promise((resolve, reject) => {
-      Email.send({
-        Host: 'smtp.gmail.com',
-        Username: state.config.gmail,
-        Password: state.config.appPwd.replace(/\s/g,''),
-        To: loc.email,
-        From: state.config.gmail,
-        Subject: document.getElementById('mail-objet').value,
-        Body: document.getElementById('mail-body').value.replace(/\n/g,'<br>'),
-        Attachments: attachments.map(a => ({name:a.filename, data:a.data}))
-      }).then(msg => { if (msg==='OK') resolve(); else reject(new Error(msg)); }).catch(reject);
-    });
-
-    zone.innerHTML = `<div class="status ok">✅ Mail envoyé à ${loc.email}</div>`;
-
-    // Proposer sauvegarde Word dans AGestion Charges
-    const archivePath = `${state.config.agestionPath}/${state.annee}/${state.immeuble}/Décomptes/`;
-    zone.innerHTML += `
-      <div class="status info" style="margin-top:8px;flex-direction:column;align-items:flex-start">
-        <div>📁 Archiver le décompte Word dans OneDrive ?</div>
-        <div style="font-family:monospace;font-size:11px;margin:6px 0">${archivePath}</div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="archiverWordOneDrive()">
-          💾 Sauvegarder dans AGestion Charges
-        </button>
+    // ÉTAPE 3 : Afficher instructions
+    zone.innerHTML = `
+      <div class="status ok">
+        ✅ App Mail ouverte — ${loc.emailGarant ? 'Locataire + Garant en destinataires' : 'Locataire en destinataire'}
+      </div>
+      <div class="card" style="margin-top:8px;background:rgba(79,110,247,0.1);border-color:rgba(79,110,247,0.3)">
+        <div style="font-size:14px;font-weight:600;margin-bottom:8px">📎 Ajoutez les pièces jointes dans Mail :</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.8">
+          1. Les fichiers ont été téléchargés dans vos <strong>Fichiers</strong><br>
+          2. Dans Mail, appuyez longuement dans le corps du message<br>
+          3. <strong>"Insérer pièce jointe"</strong><br>
+          4. Sélectionnez le décompte Word et le PDF ISTA<br>
+          5. Appuyez <strong>Envoyer</strong> ✉️
+        </div>
       </div>`;
 
-    btn.innerHTML = '✉️ Envoyer le décompte';
-    updateSendButton();
-
-  } catch(err) {
-    console.error(err);
-    zone.innerHTML = `<div class="status err">❌ Erreur : ${err.message}</div>`;
-    btn.innerHTML = '✉️ Envoyer le décompte';
-    updateSendButton();
-  }
-}
-
-function archiverWordOneDrive() {
-  if (!state.wordFile) return;
-  const url = URL.createObjectURL(state.wordFile);
-  const a = document.createElement('a');
-  a.href = url; a.download = state.wordFilename || state.wordFile.name;
-  a.click();
-  URL.revokeObjectURL(url);
-  const path = `${state.config.agestionPath}/${state.annee}/${state.immeuble}/Décomptes/`;
-  setTimeout(() => {
-    alert(`📁 Dans le menu qui s'ouvre :\n1. "Enregistrer dans Fichiers"\n2. Naviguez vers OneDrive\n3. Allez dans : ${path}\n4. "Enregistrer"`);
-  }, 500);
-}
-
-// ============================================================
-// CONFIG
-// ============================================================
-function sauvegarderSignature() {
-  state.config.signature = document.getElementById('cfg-signature').value;
-  try { localStorage.setItem('envoi_config', JSON.stringify({signature:state.config.signature,archivesPath:state.config.archivesPath,agestionPath:state.config.agestionPath})); } catch(e) {}
-  alert('✅ Signature sauvegardée');
-}
-
-function sauvegarderChemins() {
-  state.config.archivesPath = document.getElementById('cfg-archives').value.trim();
-  state.config.agestionPath = document.getElementById('cfg-agestion').value.trim();
-  try { localStorage.setItem('envoi_config', JSON.stringify({signature:state.config.signature,archivesPath:state.config.archivesPath,agestionPath:state.config.agestionPath})); } catch(e) {}
-  alert('✅ Chemins sauvegardés');
-}
-
-// ============================================================
-// EXPORT / IMPORT
-// ============================================================
-function exporterAnnuaire() {
-  const blob = new Blob([JSON.stringify(state.locataires,null,2)],{type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='annuaire_locataires.json'; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function importerAnnuaire(input) {
-  if (!input.files[0]) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data)) throw new Error('Format invalide');
-      state.locataires = data; sauvegarderDonnees(); renderLocataires(); updateSelLocataire();
-      alert('✅ Annuaire importé : '+data.length+' locataires');
-    } catch(err) { alert('❌ Fichier invalide : '+err.message); }
-  };
-  reader.readAsText(input.files[0]);
-}
-
-// ============================================================
-// UTILITAIRES
-// ============================================================
-function fileToBase64(file) {
-  return new Promise((res,rej) => { const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
-}
-function blobToBase64(blob) {
-  return new Promise((res,rej) => { const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); });
-}
-function loadScript(src) {
-  return new Promise((res,rej) => { const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
-}
-function ouvrirModal(id) { document.getElementById(id).classList.add('open'); }
-function fermerModal(id) { document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
-</script>
-</body>
-</html>
+    // Proposer archivage
+    const archivePath = state.config.agestionPath+'/'+state.annee+'/'+state.immeuble+'/Décomptes/';
+    zone.innerHTML += `
+      <div class="status info" style="flex-direction:column;align-items:flex-start">
+        <div>📁 Archiver aussi dans OneDrive ?</div>
+        <div style="font-family:monospace;font-size:11px;margin:6px 0">${archivePath}</div>
+        <button clas
