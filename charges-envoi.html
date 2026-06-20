@@ -917,62 +917,90 @@ function checkSend() {
   document.getElementById('btn-send').disabled = !ok;
 }
 
+var MAKE_WEBHOOK = 'https://hook.eu1.make.com/scuukpv6clyyhen8klvyooxnlbs8pwd5';
+
 function envoyer() {
   var btn = document.getElementById('btn-send');
   var zone = document.getElementById('send-zone');
   var loc = S.selLoc;
   btn.disabled = true;
-  btn.innerHTML = '<span class="sp"></span>Préparation...';
+  btn.innerHTML = '<span class="sp"></span>Envoi en cours...';
   zone.innerHTML = '';
-
-  // Télécharger Word
-  var wurl = URL.createObjectURL(S.wordFile);
-  var wa = document.createElement('a'); wa.href = wurl; wa.download = S.wordFile.name; wa.click();
-  URL.revokeObjectURL(wurl);
-
-  // Télécharger ISTA si PTG
-  if (S.imm === 'PTG' && S.istaFile) {
-    setTimeout(function() {
-      var iurl = URL.createObjectURL(S.istaFile.blob);
-      var ia = document.createElement('a'); ia.href = iurl; ia.download = S.istaFile.filename; ia.click();
-      URL.revokeObjectURL(iurl);
-    }, 1200);
-  }
-
-  // Construire destinataires
-  var dest = loc.email;
-  if (loc.garant) dest = dest + ',' + loc.garant;
 
   var subj = document.getElementById('mail-obj').value;
   var body = document.getElementById('mail-body').value;
+  var dest = loc.email;
+  if (loc.garant) dest = dest + ',' + loc.garant;
 
-  // Ouvrir Mail après délai
-  setTimeout(function() {
-    var mailto = 'mailto:' + encodeURIComponent(dest) +
-      '?subject=' + encodeURIComponent(subj) +
-      '&body=' + encodeURIComponent(body);
-    window.location.href = mailto;
-  }, S.imm === 'PTG' ? 2000 : 800);
+  // Lire les fichiers en base64
+  readFileBase64(S.wordFile, function(wordB64) {
+    var attachments = [{
+      filename: S.wordFile.name,
+      data: wordB64,
+      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }];
 
-  setTimeout(function() {
-    var nbDest = loc.garant ? 'Locataire + Garant' : 'Locataire';
-    var archivePath = 'AGestion Charges/' + S.annee + '/' + S.imm + '/Décomptes/';
-    zone.innerHTML =
-      '<div class="st ok">✅ App Mail ouverte — ' + nbDest + '</div>' +
-      '<div class="card" style="margin-top:8px">' +
-      '<div style="font-size:13px;font-weight:600;margin-bottom:8px">📎 Dans Mail :</div>' +
-      '<div style="font-size:12px;color:var(--txt2);line-height:1.9">' +
-      '1. Appuyez longuement dans le corps<br>' +
-      '2. <strong>Insérer pièce jointe</strong><br>' +
-      '3. Sélectionnez le Word + PDF ISTA<br>' +
-      '4. Appuyez <strong>Envoyer</strong> ✉️</div></div>' +
-      '<div class="st inf" style="flex-direction:column;align-items:flex-start;margin-top:8px">' +
-      '<div>📁 Archiver dans OneDrive ?</div>' +
-      '<div class="mono">' + archivePath + '</div>' +
-      '<button class="btn bs sm" style="margin-top:6px" onclick="archiveWord()">💾 Sauvegarder</button></div>';
-    btn.innerHTML = '✉️ Préparer un autre envoi';
-    btn.disabled = false;
-  }, 3000);
+    function sendToMake(atts) {
+      var payload = {
+        to: dest,
+        subject: subj,
+        body: body.replace(/\n/g, '<br>'),
+        attachments: atts
+      };
+
+      fetch(MAKE_WEBHOOK, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      })
+      .then(function(r) {
+        if (r.ok) {
+          var archivePath = 'AGestion Charges/' + S.annee + '/' + S.imm + '/Décomptes/';
+          zone.innerHTML =
+            '<div class="st ok">✅ Mail envoyé à ' + dest + '</div>' +
+            '<div class="st inf" style="flex-direction:column;align-items:flex-start;margin-top:8px">' +
+            '<div>📁 Archiver dans OneDrive ?</div>' +
+            '<div class="mono">' + archivePath + '</div>' +
+            '<button class="btn bs sm" style="margin-top:6px" onclick="archiveWord()">💾 Sauvegarder</button></div>';
+          btn.innerHTML = '✉️ Envoyer un autre';
+          btn.disabled = false;
+        } else {
+          throw new Error('Erreur Make.com : ' + r.status);
+        }
+      })
+      .catch(function(err) {
+        zone.innerHTML = '<div class="st er">❌ ' + err.message + '</div>';
+        btn.innerHTML = '✉️ Envoyer le décompte';
+        btn.disabled = false;
+      });
+    }
+
+    // Ajouter ISTA si PTG
+    if (S.imm === 'PTG' && S.istaFile) {
+      readBlobBase64(S.istaFile.blob, function(istaB64) {
+        attachments.push({
+          filename: S.istaFile.filename,
+          data: istaB64,
+          mime: 'application/pdf'
+        });
+        sendToMake(attachments);
+      });
+    } else {
+      sendToMake(attachments);
+    }
+  });
+}
+
+function readFileBase64(file, cb) {
+  var r = new FileReader();
+  r.onload = function(e) { cb(e.target.result.split(',')[1]); };
+  r.readAsDataURL(file);
+}
+
+function readBlobBase64(blob, cb) {
+  var r = new FileReader();
+  r.onload = function(e) { cb(e.target.result.split(',')[1]); };
+  r.readAsDataURL(blob);
 }
 
 function archiveWord() {
