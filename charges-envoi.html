@@ -761,7 +761,7 @@ function envoyer() {
       };
 
       // Ajouter ISTA si PTG
-      if (istaB64) {
+      if (istaB64 && istaFilename) {
         payload.ista_filename = istaFilename;
         payload.ista_data = istaB64;
         payload.attachments.push({filename: istaFilename, data: istaB64});
@@ -775,10 +775,20 @@ function envoyer() {
       .then(function(r) {
         if (r.ok || r.status === 200) {
           zone.innerHTML =
-            '<div class="st ok">✅ Mail envoyé à ' + dest + '<br>' +
-            '📁 Fichiers sauvegardés dans OneDrive</div>';
-          btn.innerHTML = '✉️ Envoyer un autre';
+            '<div class="st ok">✅ Mail envoyé à ' + dest + '</div>';
+          btn.innerHTML = '✉️ Envoyer le décompte';
           btn.disabled = false;
+          // Réinitialiser les fichiers pour le prochain envoi
+          S.wordFile = null;
+          S.istaFile = null;
+          document.getElementById('word-sub').textContent = 'Sélectionner le fichier Word';
+          document.getElementById('word-ok').textContent = '⬜';
+          document.getElementById('word-path').textContent = '';
+          document.getElementById('ista-sub').textContent = 'Sélectionner le PDF ISTA';
+          document.getElementById('ista-ok').textContent = '⬜';
+          try { document.getElementById('inp-word').value = ''; } catch(e) {}
+          try { document.getElementById('inp-ista').value = ''; } catch(e) {}
+          checkSend();
         } else {
           return r.text().then(function(t) {
             throw new Error('Make.com erreur ' + r.status + ' : ' + t);
@@ -873,12 +883,12 @@ document.querySelectorAll('.mo').forEach(function(el) {
 <body>
 
 <div class="nav">
-  <div style="display:flex;align-items:center;gap:12px">
-    <button onclick="history.back()" style="background:none;border:none;color:var(--acc);font-size:16px;cursor:pointer;padding:0">‹ Retour</button>
+  <div style="display:flex;align-items:center;justify-content:space-between">
     <div>
       <h1>📬 Envoi Décomptes</h1>
       <p>Biche · Nimy · Petite Guirlande</p>
     </div>
+    <button onclick="location.reload()" style="background:none;border:1px solid var(--brd);color:var(--txt2);font-size:13px;cursor:pointer;padding:6px 12px;border-radius:8px">↺ Réinit.</button>
   </div>
 </div>
 
