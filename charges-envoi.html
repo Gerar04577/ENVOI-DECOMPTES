@@ -774,8 +774,10 @@ function envoyer() {
       })
       .then(function(r) {
         if (r.ok || r.status === 200) {
+          var archivePath = 'Archives Charges Immeubles/' + S.imm + '/' + loc.apt + '/';
           zone.innerHTML =
-            '<div class="st ok">✅ Mail envoyé à ' + dest + '</div>';
+            '<div class="st ok">✅ Mail envoyé à ' + dest + '</div>' +
+            '<div class="st ok" style="margin-top:6px">📁 Sauvegardé dans OneDrive :<br><span style="font-family:monospace;font-size:11px">' + archivePath + '</span></div>';
           btn.innerHTML = '✉️ Envoyer le décompte';
           btn.disabled = false;
           // Réinitialiser les fichiers pour le prochain envoi
@@ -1069,14 +1071,4 @@ document.querySelectorAll('.mo').forEach(function(el) {
 
 <!-- MODAL ISTA PICKER -->
 <div class="mo" id="mo-ista">
-  <div class="mb">
-    <div class="mh"></div>
-    <div class="mt">Sélectionner le PDF ISTA</div>
-    <div id="ista-pick-list"></div>
-    <button class="btn bs" style="margin-top:10px" onclick="closeModal('mo-ista')">Annuler</button>
-  </div>
-</div>
-
-
-</body>
-</html>
+ 
