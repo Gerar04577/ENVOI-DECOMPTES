@@ -743,30 +743,28 @@ function envoyer() {
   readFileBase64(S.wordFile, function(wordB64) {
 
     function sendToMake(istaB64, istaFilename) {
-      // Payload principal : décompte Word
+      // Envoyer les fichiers comme champs séparés
+      // Make.com peut ainsi les traiter individuellement
       var payload = {
         to: dest,
         subject: subj,
         body: body.replace(/\n/g, '<br>'),
         immeuble: S.imm,
         apt: loc.apt,
-        filename: S.wordFile.name,
-        filedata: wordB64,
-        // Pièces jointes pour Gmail (format Make)
-        attachments: [{
-          filename: S.wordFile.name,
-          data: wordB64
-        }]
+        // Fichier Word
+        word_filename: S.wordFile.name,
+        word_data: wordB64,
+        // Pour Gmail attachments
+        attachments: [
+          {filename: S.wordFile.name, data: wordB64}
+        ]
       };
 
       // Ajouter ISTA si PTG
       if (istaB64) {
-        payload.attachments.push({
-          filename: istaFilename,
-          data: istaB64
-        });
         payload.ista_filename = istaFilename;
-        payload.ista_filedata = istaB64;
+        payload.ista_data = istaB64;
+        payload.attachments.push({filename: istaFilename, data: istaB64});
       }
 
       fetch(MAKE_WEBHOOK, {
