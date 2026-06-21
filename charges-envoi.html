@@ -87,8 +87,13 @@ input[type=file]{display:none}
 <body>
 
 <div class="nav">
-  <h1>📬 Envoi Décomptes</h1>
-  <p>Biche · Nimy · Petite Guirlande</p>
+  <div style="display:flex;align-items:center;gap:12px">
+    <button onclick="history.back()" style="background:none;border:none;color:var(--acc);font-size:16px;cursor:pointer;padding:0">‹ Retour</button>
+    <div>
+      <h1>📬 Envoi Décomptes</h1>
+      <p>Biche · Nimy · Petite Guirlande</p>
+    </div>
+  </div>
 </div>
 
 <div class="tabs">
@@ -932,21 +937,35 @@ function envoyer() {
   var dest = loc.email;
   if (loc.garant) dest = dest + ',' + loc.garant;
 
-  // Lire les fichiers en base64
+  // Lire Word en base64
   readFileBase64(S.wordFile, function(wordB64) {
-    var attachments = [{
-      filename: S.wordFile.name,
-      data: wordB64,
-      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    }];
 
-    function sendToMake(atts) {
+    function sendToMake(istaB64, istaFilename) {
+      // Payload principal : décompte Word
       var payload = {
         to: dest,
         subject: subj,
         body: body.replace(/\n/g, '<br>'),
-        attachments: atts
+        immeuble: S.imm,
+        apt: loc.apt,
+        filename: S.wordFile.name,
+        filedata: wordB64,
+        // Pièces jointes pour Gmail (format Make)
+        attachments: [{
+          filename: S.wordFile.name,
+          data: wordB64
+        }]
       };
+
+      // Ajouter ISTA si PTG
+      if (istaB64) {
+        payload.attachments.push({
+          filename: istaFilename,
+          data: istaB64
+        });
+        payload.ista_filename = istaFilename;
+        payload.ista_filedata = istaB64;
+      }
 
       fetch(MAKE_WEBHOOK, {
         method: 'POST',
@@ -954,18 +973,16 @@ function envoyer() {
         body: JSON.stringify(payload)
       })
       .then(function(r) {
-        if (r.ok) {
-          var archivePath = 'AGestion Charges/' + S.annee + '/' + S.imm + '/Décomptes/';
+        if (r.ok || r.status === 200) {
           zone.innerHTML =
-            '<div class="st ok">✅ Mail envoyé à ' + dest + '</div>' +
-            '<div class="st inf" style="flex-direction:column;align-items:flex-start;margin-top:8px">' +
-            '<div>📁 Archiver dans OneDrive ?</div>' +
-            '<div class="mono">' + archivePath + '</div>' +
-            '<button class="btn bs sm" style="margin-top:6px" onclick="archiveWord()">💾 Sauvegarder</button></div>';
+            '<div class="st ok">✅ Mail envoyé à ' + dest + '<br>' +
+            '📁 Fichiers sauvegardés dans OneDrive</div>';
           btn.innerHTML = '✉️ Envoyer un autre';
           btn.disabled = false;
         } else {
-          throw new Error('Erreur Make.com : ' + r.status);
+          return r.text().then(function(t) {
+            throw new Error('Make.com erreur ' + r.status + ' : ' + t);
+          });
         }
       })
       .catch(function(err) {
@@ -978,28 +995,32 @@ function envoyer() {
     // Ajouter ISTA si PTG
     if (S.imm === 'PTG' && S.istaFile) {
       readBlobBase64(S.istaFile.blob, function(istaB64) {
-        attachments.push({
-          filename: S.istaFile.filename,
-          data: istaB64,
-          mime: 'application/pdf'
-        });
-        sendToMake(attachments);
+        sendToMake(istaB64, S.istaFile.filename);
       });
     } else {
-      sendToMake(attachments);
+      sendToMake(null, null);
     }
   });
 }
 
 function readFileBase64(file, cb) {
   var r = new FileReader();
-  r.onload = function(e) { cb(e.target.result.split(',')[1]); };
+  // Retourner base64 pur SANS le préfixe data:...
+  r.onload = function(e) { 
+    var result = e.target.result;
+    var b64 = result.indexOf(',') >= 0 ? result.split(',')[1] : result;
+    cb(b64); 
+  };
   r.readAsDataURL(file);
 }
 
 function readBlobBase64(blob, cb) {
   var r = new FileReader();
-  r.onload = function(e) { cb(e.target.result.split(',')[1]); };
+  r.onload = function(e) { 
+    var result = e.target.result;
+    var b64 = result.indexOf(',') >= 0 ? result.split(',')[1] : result;
+    cb(b64); 
+  };
   r.readAsDataURL(blob);
 }
 
@@ -1039,14 +1060,4 @@ function importLoc(input) {
   input.value = '';
 }
 
-// ============================================================
-// MODALS
-// ============================================================
-function openModal(id) { document.getElementById(id).classList.add('on'); }
-function closeModal(id) { document.getElementById(id).classList.remove('on'); }
-document.querySelectorAll('.mo').forEach(function(el) {
-  el.addEventListener('click', function(e) { if (e.target === el) el.classList.remove('on'); });
-});
-</script>
-</body>
-</html>
+// ===========================================
