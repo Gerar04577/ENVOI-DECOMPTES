@@ -83,6 +83,206 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg
 input[type=file]{display:none}
 .mono{font-family:monospace;font-size:11px;color:var(--txt2);margin-top:3px}
 </style>
+
+</head>
+<body>
+
+<div class="nav">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <h1>📬 Envoi Décomptes</h1>
+      <p>Biche · Nimy · Petite Guirlande</p>
+    </div>
+    <button onclick="location.reload()" style="background:none;border:1px solid var(--brd);color:var(--txt2);font-size:13px;cursor:pointer;padding:6px 12px;border-radius:8px">↺ Réinit.</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" id="tab-envoi" onclick="goPage('envoi')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>Envoyer
+  </button>
+  <button class="tab" id="tab-ista" onclick="goPage('ista')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>ISTA
+  </button>
+  <button class="tab" id="tab-loc" onclick="goPage('loc')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg>Locataires
+  </button>
+  <button class="tab" id="tab-cfg" onclick="goPage('cfg')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>Config
+  </button>
+</div>
+
+<div class="wrap">
+
+<!-- ===== ENVOI ===== -->
+<div class="pg on" id="pg-envoi">
+  <div class="card">
+    <div class="ct">Année</div>
+    <div class="ytabs" id="yt-envoi"></div>
+  </div>
+  <div class="card">
+    <div class="ct">Immeuble</div>
+    <div class="itabs" id="it-envoi">
+      <div class="it on" onclick="setImm('Biche',this)">Biche</div>
+      <div class="it" onclick="setImm('Nimy',this)">Nimy</div>
+      <div class="it" onclick="setImm('PTG',this)">PTG</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">Locataire</div>
+    <div class="f">
+      <select id="sel-loc" onchange="onSelLoc()">
+        <option value="">— Sélectionner —</option>
+      </select>
+    </div>
+    <div id="email-zone" style="display:none"></div>
+  </div>
+  <div class="card">
+    <div class="ct">Pièces jointes</div>
+    <div class="pj" onclick="document.getElementById('inp-word').click()">
+      <div class="pj-ico">📄</div>
+      <div style="flex:1">
+        <div class="pj-name">Décompte charges</div>
+        <div class="pj-sub" id="word-sub">Sélectionner le fichier Word</div>
+        <div class="mono" id="word-path"></div>
+      </div>
+      <div class="pj-ok" id="word-ok">⬜</div>
+    </div>
+    <input type="file" id="inp-word" accept=".docx,.doc,.pdf" onchange="onWord(this)"/>
+    <div class="pj" id="pj-ista" style="display:none" onclick="openIstaPick()">
+      <div class="pj-ico">🔥</div>
+      <div style="flex:1">
+        <div class="pj-name">Décompte ISTA <span style="background:rgba(124,58,237,.2);color:#a78bfa;font-size:10px;font-weight:700;padding:2px 7px;border-radius:12px">PTG</span></div>
+        <div class="pj-sub" id="ista-sub">Sélectionner le PDF ISTA</div>
+      </div>
+      <div class="pj-ok" id="ista-ok">⬜</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">Mail</div>
+    <div class="f"><input type="text" id="mail-obj" placeholder="Objet"/></div>
+    <div class="f">
+      <label>Message</label>
+      <textarea id="mail-body" rows="5" style="resize:none"></textarea>
+    </div>
+  </div>
+  <div id="send-zone"></div>
+  <button class="btn bg" id="btn-send" onclick="envoyer()" disabled>✉️ Envoyer le décompte</button>
+</div>
+
+<!-- ===== ISTA ===== -->
+<div class="pg" id="pg-ista">
+  <div class="card">
+    <div class="ct">Année de référence</div>
+    <div class="ytabs" id="yt-ista"></div>
+  </div>
+  <div class="card">
+    <div class="ct">Importer PDF ISTA global (PTG)</div>
+    <div style="border:2px dashed var(--brd);border-radius:10px;padding:22px;text-align:center;cursor:pointer" onclick="document.getElementById('inp-ista').click()">
+      <div style="font-size:32px">📋</div>
+      <p style="font-size:13px;color:var(--txt2);margin-top:8px">Appuyer pour importer le PDF ISTA</p>
+    </div>
+    <input type="file" id="inp-ista" accept=".pdf" onchange="loadIsta(this)"/>
+  </div>
+  <div id="ista-prog" style="display:none">
+    <div class="st inf">⏳ Analyse en cours...</div>
+    <div class="prog"><div class="pf" id="pf" style="width:0%"></div></div>
+  </div>
+  <div id="ista-res"></div>
+</div>
+
+<!-- ===== LOCATAIRES ===== -->
+<div class="pg" id="pg-loc">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+    <div class="itabs" style="margin:0;flex:1" id="it-loc">
+      <div class="it on" onclick="setImmLoc('Biche',this)">Biche</div>
+      <div class="it" onclick="setImmLoc('Nimy',this)">Nimy</div>
+      <div class="it" onclick="setImmLoc('PTG',this)">PTG</div>
+    </div>
+    <button class="btn bp sm" onclick="openAdd()">+ Ajouter</button>
+  </div>
+  <!-- Import Excel -->
+  <div class="card">
+    <div class="ct">Import Excel</div>
+    <div class="f">
+      <label>Immeuble</label>
+      <select id="xl-imm">
+        <option value="Biche">Biche</option>
+        <option value="Nimy">Nimy</option>
+        <option value="PTG">Petite Guirlande</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px">
+      <div class="f" style="flex:1"><label>Col. Unité</label><input type="text" id="xl-u" value="A" maxlength="2"/></div>
+      <div class="f" style="flex:1"><label>Col. Nom</label><input type="text" id="xl-n" value="B" maxlength="2"/></div>
+      <div class="f" style="flex:1"><label>Col. Email</label><input type="text" id="xl-e" value="C" maxlength="2"/></div>
+      <div class="f" style="flex:1"><label>Col. Garant</label><input type="text" id="xl-g" value="D" maxlength="2"/></div>
+    </div>
+    <div class="f"><label>1ère ligne de données</label><input type="number" id="xl-r" value="2" min="1"/></div>
+    <button class="btn bp" onclick="document.getElementById('inp-xl').click()">📊 Importer Excel</button>
+    <input type="file" id="inp-xl" accept=".xlsx,.xls" onchange="loadXl(this)"/>
+    <div id="xl-status" style="margin-top:8px"></div>
+  </div>
+  <div id="list-loc"></div>
+</div>
+
+<!-- ===== CONFIG ===== -->
+<div class="pg" id="pg-cfg">
+  <div class="card">
+    <div class="ct">Gmail</div>
+    <div class="st ok">✅ jemagerard@gmail.com configuré</div>
+    <div class="st ok">✅ Mot de passe d'application actif</div>
+  </div>
+  <div class="card">
+    <div class="ct">Signature mail</div>
+    <div class="f"><textarea id="cfg-sig" rows="4" style="resize:none"></textarea></div>
+    <button class="btn bs" onclick="saveSig()">💾 Sauvegarder</button>
+  </div>
+  <div class="card">
+    <div class="ct">Annuaire</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn bs" style="flex:1" onclick="exportLoc()">📤 Exporter JSON</button>
+      <button class="btn bs" style="flex:1" onclick="document.getElementById('inp-imp').click()">📥 Importer JSON</button>
+    </div>
+    <button class="btn br" onclick="resetLoc()">🔄 Réinitialiser liste 2025-2026</button>
+    <input type="file" id="inp-imp" accept=".json" onchange="importLoc(this)"/>
+  </div>
+</div>
+
+</div><!-- wrap -->
+
+<!-- MODAL LOCATAIRE -->
+<div class="mo" id="mo-loc">
+  <div class="mb">
+    <div class="mh"></div>
+    <div class="mt" id="mo-title">Ajouter un locataire</div>
+    <div class="f"><label>Immeuble</label>
+      <select id="m-imm"><option value="Biche">Biche</option><option value="Nimy">Nimy</option><option value="PTG">Petite Guirlande</option></select>
+    </div>
+    <div class="f"><label>Appartement / Studio</label><input type="text" id="m-apt" placeholder="Studio 4"/></div>
+    <div class="f"><label>Nom complet</label><input type="text" id="m-nom" placeholder="DUPONT Jean"/></div>
+    <div class="f"><label>Email locataire</label><input type="email" id="m-email" placeholder="locataire@email.com"/></div>
+    <div class="f"><label>Email garant (optionnel)</label><input type="email" id="m-garant" placeholder="garant@email.com"/></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn bs" style="flex:1" onclick="closeModal('mo-loc')">Annuler</button>
+      <button class="btn bp" style="flex:1" onclick="saveLoc()">Sauvegarder</button>
+    </div>
+    <div style="height:8px"></div>
+    <button class="btn br" id="btn-del" style="display:none" onclick="delLoc()">🗑 Supprimer</button>
+  </div>
+</div>
+
+<!-- MODAL ISTA PICKER -->
+<div class="mo" id="mo-ista">
+  <div class="mb">
+    <div class="mh"></div>
+    <div class="mt">Sélectionner le PDF ISTA</div>
+    <div id="ista-pick-list"></div>
+    <button class="btn bs" style="margin-top:10px" onclick="closeModal('mo-ista')">Annuler</button>
+  </div>
+</div>
+
+
 <script>
 // ============================================================
 // DONNÉES
@@ -881,194 +1081,5 @@ document.querySelectorAll('.mo').forEach(function(el) {
   el.addEventListener('click', function(e) { if (e.target === el) el.classList.remove('on'); });
 });
 </script>
-</head>
-<body>
-
-<div class="nav">
-  <div style="display:flex;align-items:center;justify-content:space-between">
-    <div>
-      <h1>📬 Envoi Décomptes</h1>
-      <p>Biche · Nimy · Petite Guirlande</p>
-    </div>
-    <button onclick="location.reload()" style="background:none;border:1px solid var(--brd);color:var(--txt2);font-size:13px;cursor:pointer;padding:6px 12px;border-radius:8px">↺ Réinit.</button>
-  </div>
-</div>
-
-<div class="tabs">
-  <button class="tab on" id="tab-envoi" onclick="goPage('envoi')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>Envoyer
-  </button>
-  <button class="tab" id="tab-ista" onclick="goPage('ista')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>ISTA
-  </button>
-  <button class="tab" id="tab-loc" onclick="goPage('loc')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg>Locataires
-  </button>
-  <button class="tab" id="tab-cfg" onclick="goPage('cfg')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>Config
-  </button>
-</div>
-
-<div class="wrap">
-
-<!-- ===== ENVOI ===== -->
-<div class="pg on" id="pg-envoi">
-  <div class="card">
-    <div class="ct">Année</div>
-    <div class="ytabs" id="yt-envoi"></div>
-  </div>
-  <div class="card">
-    <div class="ct">Immeuble</div>
-    <div class="itabs" id="it-envoi">
-      <div class="it on" onclick="setImm('Biche',this)">Biche</div>
-      <div class="it" onclick="setImm('Nimy',this)">Nimy</div>
-      <div class="it" onclick="setImm('PTG',this)">PTG</div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="ct">Locataire</div>
-    <div class="f">
-      <select id="sel-loc" onchange="onSelLoc()">
-        <option value="">— Sélectionner —</option>
-      </select>
-    </div>
-    <div id="email-zone" style="display:none"></div>
-  </div>
-  <div class="card">
-    <div class="ct">Pièces jointes</div>
-    <div class="pj" onclick="document.getElementById('inp-word').click()">
-      <div class="pj-ico">📄</div>
-      <div style="flex:1">
-        <div class="pj-name">Décompte charges</div>
-        <div class="pj-sub" id="word-sub">Sélectionner le fichier Word</div>
-        <div class="mono" id="word-path"></div>
-      </div>
-      <div class="pj-ok" id="word-ok">⬜</div>
-    </div>
-    <input type="file" id="inp-word" accept=".docx,.doc,.pdf" onchange="onWord(this)"/>
-    <div class="pj" id="pj-ista" style="display:none" onclick="openIstaPick()">
-      <div class="pj-ico">🔥</div>
-      <div style="flex:1">
-        <div class="pj-name">Décompte ISTA <span style="background:rgba(124,58,237,.2);color:#a78bfa;font-size:10px;font-weight:700;padding:2px 7px;border-radius:12px">PTG</span></div>
-        <div class="pj-sub" id="ista-sub">Sélectionner le PDF ISTA</div>
-      </div>
-      <div class="pj-ok" id="ista-ok">⬜</div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="ct">Mail</div>
-    <div class="f"><input type="text" id="mail-obj" placeholder="Objet"/></div>
-    <div class="f">
-      <label>Message</label>
-      <textarea id="mail-body" rows="5" style="resize:none"></textarea>
-    </div>
-  </div>
-  <div id="send-zone"></div>
-  <button class="btn bg" id="btn-send" onclick="envoyer()" disabled>✉️ Envoyer le décompte</button>
-</div>
-
-<!-- ===== ISTA ===== -->
-<div class="pg" id="pg-ista">
-  <div class="card">
-    <div class="ct">Année de référence</div>
-    <div class="ytabs" id="yt-ista"></div>
-  </div>
-  <div class="card">
-    <div class="ct">Importer PDF ISTA global (PTG)</div>
-    <div style="border:2px dashed var(--brd);border-radius:10px;padding:22px;text-align:center;cursor:pointer" onclick="document.getElementById('inp-ista').click()">
-      <div style="font-size:32px">📋</div>
-      <p style="font-size:13px;color:var(--txt2);margin-top:8px">Appuyer pour importer le PDF ISTA</p>
-    </div>
-    <input type="file" id="inp-ista" accept=".pdf" onchange="loadIsta(this)"/>
-  </div>
-  <div id="ista-prog" style="display:none">
-    <div class="st inf">⏳ Analyse en cours...</div>
-    <div class="prog"><div class="pf" id="pf" style="width:0%"></div></div>
-  </div>
-  <div id="ista-res"></div>
-</div>
-
-<!-- ===== LOCATAIRES ===== -->
-<div class="pg" id="pg-loc">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-    <div class="itabs" style="margin:0;flex:1" id="it-loc">
-      <div class="it on" onclick="setImmLoc('Biche',this)">Biche</div>
-      <div class="it" onclick="setImmLoc('Nimy',this)">Nimy</div>
-      <div class="it" onclick="setImmLoc('PTG',this)">PTG</div>
-    </div>
-    <button class="btn bp sm" onclick="openAdd()">+ Ajouter</button>
-  </div>
-  <!-- Import Excel -->
-  <div class="card">
-    <div class="ct">Import Excel</div>
-    <div class="f">
-      <label>Immeuble</label>
-      <select id="xl-imm">
-        <option value="Biche">Biche</option>
-        <option value="Nimy">Nimy</option>
-        <option value="PTG">Petite Guirlande</option>
-      </select>
-    </div>
-    <div style="display:flex;gap:8px">
-      <div class="f" style="flex:1"><label>Col. Unité</label><input type="text" id="xl-u" value="A" maxlength="2"/></div>
-      <div class="f" style="flex:1"><label>Col. Nom</label><input type="text" id="xl-n" value="B" maxlength="2"/></div>
-      <div class="f" style="flex:1"><label>Col. Email</label><input type="text" id="xl-e" value="C" maxlength="2"/></div>
-      <div class="f" style="flex:1"><label>Col. Garant</label><input type="text" id="xl-g" value="D" maxlength="2"/></div>
-    </div>
-    <div class="f"><label>1ère ligne de données</label><input type="number" id="xl-r" value="2" min="1"/></div>
-    <button class="btn bp" onclick="document.getElementById('inp-xl').click()">📊 Importer Excel</button>
-    <input type="file" id="inp-xl" accept=".xlsx,.xls" onchange="loadXl(this)"/>
-    <div id="xl-status" style="margin-top:8px"></div>
-  </div>
-  <div id="list-loc"></div>
-</div>
-
-<!-- ===== CONFIG ===== -->
-<div class="pg" id="pg-cfg">
-  <div class="card">
-    <div class="ct">Gmail</div>
-    <div class="st ok">✅ jemagerard@gmail.com configuré</div>
-    <div class="st ok">✅ Mot de passe d'application actif</div>
-  </div>
-  <div class="card">
-    <div class="ct">Signature mail</div>
-    <div class="f"><textarea id="cfg-sig" rows="4" style="resize:none"></textarea></div>
-    <button class="btn bs" onclick="saveSig()">💾 Sauvegarder</button>
-  </div>
-  <div class="card">
-    <div class="ct">Annuaire</div>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <button class="btn bs" style="flex:1" onclick="exportLoc()">📤 Exporter JSON</button>
-      <button class="btn bs" style="flex:1" onclick="document.getElementById('inp-imp').click()">📥 Importer JSON</button>
-    </div>
-    <button class="btn br" onclick="resetLoc()">🔄 Réinitialiser liste 2025-2026</button>
-    <input type="file" id="inp-imp" accept=".json" onchange="importLoc(this)"/>
-  </div>
-</div>
-
-</div><!-- wrap -->
-
-<!-- MODAL LOCATAIRE -->
-<div class="mo" id="mo-loc">
-  <div class="mb">
-    <div class="mh"></div>
-    <div class="mt" id="mo-title">Ajouter un locataire</div>
-    <div class="f"><label>Immeuble</label>
-      <select id="m-imm"><option value="Biche">Biche</option><option value="Nimy">Nimy</option><option value="PTG">Petite Guirlande</option></select>
-    </div>
-    <div class="f"><label>Appartement / Studio</label><input type="text" id="m-apt" placeholder="Studio 4"/></div>
-    <div class="f"><label>Nom complet</label><input type="text" id="m-nom" placeholder="DUPONT Jean"/></div>
-    <div class="f"><label>Email locataire</label><input type="email" id="m-email" placeholder="locataire@email.com"/></div>
-    <div class="f"><label>Email garant (optionnel)</label><input type="email" id="m-garant" placeholder="garant@email.com"/></div>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="btn bs" style="flex:1" onclick="closeModal('mo-loc')">Annuler</button>
-      <button class="btn bp" style="flex:1" onclick="saveLoc()">Sauvegarder</button>
-    </div>
-    <div style="height:8px"></div>
-    <button class="btn br" id="btn-del" style="display:none" onclick="delLoc()">🗑 Supprimer</button>
-  </div>
-</div>
-
-<!-- MODAL ISTA PICKER -->
-<div class="mo" id="mo-ista">
- 
+</body>
+</html>
