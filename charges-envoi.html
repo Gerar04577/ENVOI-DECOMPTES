@@ -160,6 +160,10 @@ input[type=file]{display:none}
   </div>
   <div class="card">
     <div class="ct">Mail</div>
+    <div class="f" style="display:flex;gap:8px;align-items:flex-end">
+      <div style="flex:1"><label style="font-size:11px;color:#aaa;display:block;margin-bottom:4px">Période du</label><input type="date" id="periode-from" onchange="updateMailFields()" style="width:100%;padding:8px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#fff"/></div>
+      <div style="flex:1"><label style="font-size:11px;color:#aaa;display:block;margin-bottom:4px">au</label><input type="date" id="periode-to" onchange="updateMailFields()" style="width:100%;padding:8px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#fff"/></div>
+    </div>
     <div class="f"><input type="text" id="mail-obj" placeholder="Objet"/></div>
     <div class="f">
       <label>Message</label>
@@ -334,7 +338,7 @@ const LOC_DEF = [
 var S = {
   imm: 'Biche',
   immLoc: 'Biche',
-  annee: '2024-2025',
+  annee: (function() { var m = new Date().getMonth(); var y = new Date().getFullYear(); return m >= 8 ? y + '-' + (y+1) : (y-1) + '-' + y; })(),
   locs: [],
   istaPages: [],
   selLoc: null,
@@ -909,14 +913,32 @@ function pickIsta(i) {
 // ============================================================
 // MAIL
 // ============================================================
+function fmtDateFR(iso) {
+  if (!iso) return '';
+  var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0];
+}
+
+function getPeriodeLabel() {
+  var f = document.getElementById('periode-from') ? document.getElementById('periode-from').value : '';
+  var t = document.getElementById('periode-to') ? document.getElementById('periode-to').value : '';
+  if (f && t) return 'du ' + fmtDateFR(f) + ' au ' + fmtDateFR(t);
+  return S.annee;
+}
+
+function updateMailFields() {
+  fillObj(); fillBody();
+}
+
 function fillObj() {
   var nom = S.selLoc ? S.selLoc.nom : '';
-  document.getElementById('mail-obj').value = 'Décompte de charges ' + S.annee + ' — ' + S.imm + (nom ? ' — ' + nom : '');
+  var periode = getPeriodeLabel();
+  document.getElementById('mail-obj').value = 'Décompte de charges ' + periode + ' — ' + S.imm + (nom ? ' — ' + nom : '');
 }
 
 function fillBody() {
+  var periode = getPeriodeLabel();
   document.getElementById('mail-body').value =
-    'Bonjour,\n\nVeuillez trouver ci-joint votre décompte de charges ' + S.annee + '.\n\nN\'hésitez pas à me contacter pour toute question.\n\n' + S.sig;
+    'Bonjour,\n\nVeuillez trouver ci-joint votre décompte de charges ' + periode + '.\n\nN\'hésitez pas à me contacter pour toute question.\n\n' + S.sig;
 }
 
 function checkSend() {
