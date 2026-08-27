@@ -345,6 +345,7 @@ var S = {
   istaAvertissement: null,
   selLoc: null,
   wordFile: null,
+  wordType: null,
   istaFile: null,
   editId: null,
   sig: 'Cordialement,\n\nJean-Marc GÉRARD',
@@ -664,9 +665,70 @@ function loadXl(input) {
 // ============================================================
 // FICHIERS WORD
 // ============================================================
+// Lit les premiers octets d'un fichier pour reconnaitre son VRAI type.
+// L'extension ne prouve rien : un PDF renomme en .docx reste un PDF.
+function premiersOctets(fichier, combien) {
+  return new Promise(function(resoudre, rejeter) {
+    var lecteur = new FileReader();
+    lecteur.onload = function() {
+      var vue = new Uint8Array(lecteur.result);
+      var texte = '';
+      for (var i = 0; i < vue.length; i++) texte += String.fromCharCode(vue[i]);
+      resoudre(texte);
+    };
+    lecteur.onerror = function() { rejeter(lecteur.error || new Error('Lecture impossible.')); };
+    lecteur.readAsArrayBuffer(fichier.slice(0, combien));
+  });
+}
+
+// Un .docx est une archive ZIP : ses deux premiers octets sont « PK ».
+// Un PDF commence par « %PDF ».
+function reconnaitreType(debut) {
+  if (debut.indexOf('%PDF') === 0) return 'pdf';
+  if (debut.indexOf('PK') === 0) return 'docx';
+  if (debut.indexOf('\xD0\xCF\x11\xE0') === 0) return 'doc';   // ancien Word
+  return 'inconnu';
+}
+
+function refuserWord(message) {
+  S.wordFile = null;
+  document.getElementById('word-sub').textContent = 'Sélectionner le fichier Word';
+  document.getElementById('word-path').textContent = '';
+  document.getElementById('word-ok').textContent = '⬜';
+  checkSend();
+  alert(message);
+}
+
 function onWord(input) {
   if (!input.files[0]) return;
-  S.wordFile = input.files[0];
+  var fichier = input.files[0];
+  premiersOctets(fichier, 8).then(function(debut) {
+    var type = reconnaitreType(debut);
+    if (type === 'pdf') {
+      refuserWord('Ce fichier est un PDF, pas un document Word.\n\n'
+        + '« ' + fichier.name + ' »\n\n'
+        + 'Si c\'est le décompte ISTA, il se choisit dans l\'onglet ISTA, pas ici. '
+        + 'Le décompte de charges est le fichier .docx produit par Charges & Compteurs.');
+      return;
+    }
+    if (type === 'inconnu') {
+      refuserWord('Ce fichier n\'est pas un document Word.\n\n'
+        + '« ' + fichier.name + ' »\n\n'
+        + 'Choisissez le fichier .docx produit par Charges & Compteurs.');
+      return;
+    }
+    accepterWord(fichier, type);
+  }).catch(function() {
+    // On ne peut pas verifier : on accepte, mais on le DIT.
+    accepterWord(fichier, null);
+    alert('Le contenu du fichier n\'a pas pu être vérifié. Assurez-vous qu\'il s\'agit bien du décompte Word.');
+  });
+  input.value = '';
+}
+
+function accepterWord(fichier, type) {
+  S.wordFile = fichier;
+  S.wordType = type;   // 'docx', 'doc', ou null si non verifiable
   document.getElementById('word-sub').textContent = S.wordFile.name;
   document.getElementById('word-path').textContent = '📁 ' + DOSSIER_RACINE_DOCUMENTS + ' › ' + cheminArchive(S.imm, (S.selLoc && S.selLoc.apt) || '').replace(/^\//, '').split('/').join(' › ');
   document.getElementById('word-ok').textContent = '✅';
@@ -1175,7 +1237,7 @@ function nomDocument(prefixe, immeuble, apt, locataire, periode, extension) {
 
 // Numero de version, affiche en haut de l'ecran. A INCREMENTER a chaque
 // modification : sans lui, impossible de savoir quelle version tourne.
-var APP_VERSION = 'v5';
+var APP_VERSION = 'v6';
 
 var MAKE_WEBHOOK = 'https://hook.eu1.make.com/scuukpv6clyyhen8klvyooxnlbs8pwd5';
 
@@ -1202,7 +1264,10 @@ function envoyer() {
       // dans le code, visible et verifiable, plutot que cachee dans le scenario.
       var periode = periodeDepuisNomWord(S.wordFile.name);
       var dossier = cheminArchive(S.imm, loc.apt);
-      var nomWord = nomDocument('Decompte', S.imm, loc.apt, loc.nom, periode, 'docx');
+      // On garde l'extension REELLE du fichier, jamais une extension imposee :
+      // un document mal nomme est un document que personne ne peut ouvrir.
+      var extensionWord = S.wordType || (S.wordFile.name.split('.').pop() || 'docx').toLowerCase();
+      var nomWord = nomDocument('Decompte', S.imm, loc.apt, loc.nom, periode, extensionWord);
 
       var payload = {
         to: dest,
