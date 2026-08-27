@@ -654,7 +654,7 @@ function onWord(input) {
   if (!input.files[0]) return;
   S.wordFile = input.files[0];
   document.getElementById('word-sub').textContent = S.wordFile.name;
-  document.getElementById('word-path').textContent = '📁 Archives Charges Immeubles › ' + S.imm;
+  document.getElementById('word-path').textContent = '📁 ' + DOSSIER_RACINE_DOCUMENTS + ' › ' + cheminArchive(S.imm, (S.selLoc && S.selLoc.apt) || '').split('/').join(' › ');
   document.getElementById('word-ok').textContent = '✅';
   checkSend();
 }
@@ -946,6 +946,57 @@ function checkSend() {
   document.getElementById('btn-send').disabled = !ok;
 }
 
+/* ============================================================================
+   CHEMIN D'ARCHIVAGE — identique a celui de Charges & Compteurs
+   ----------------------------------------------------------------------------
+   Les deux applications doivent deposer leurs documents dans le MEME dossier :
+       SAUVEGARDE DECOMPTES / annee / immeuble / logement
+   Les fonctions ci-dessous sont donc copiees telles quelles de l'autre
+   application. NE PAS LES MODIFIER d'un seul cote.
+   ============================================================================ */
+
+// Nettoyage d'un nom pour en faire un nom de dossier ou de fichier.
+function cleanPath(str) {
+  return (str || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^A-Za-z0-9_-]/g, "");
+}
+
+// Les libelles d'immeuble differaient entre les deux applications :
+// « PTG » ici, « Petite Guirlande (PTG) » la-bas. On aligne sur l'autre.
+var NOM_IMMEUBLE_COMPLET = {
+  "PTG": "Petite Guirlande (PTG)",
+  "Biche": "Biche",
+  "Nimy": "Nimy"
+};
+
+// Dossier racine configure dans le module OneDrive du scenario Make.
+var DOSSIER_RACINE_DOCUMENTS = "SAUVEGARDE DECOMPTES";
+
+// Chemin RELATIF envoye a Make : annee / immeuble / logement.
+function cheminArchive(immeuble, apt) {
+  var annee = String(new Date().getFullYear());
+  var nomComplet = NOM_IMMEUBLE_COMPLET[immeuble] || immeuble;
+  return annee + "/" + cleanPath(nomComplet) + "/" + cleanPath(apt);
+}
+
+// La periode se lit sur le nom du fichier Word produit par Charges &
+// Compteurs : « Decompte_..._27-08-2025---27-08-2026.docx ». Si le fichier a
+// ete renomme a la main, on ne l'invente pas : on renvoie une chaine vide.
+function periodeDepuisNomWord(nomFichier) {
+  var m = String(nomFichier || "").match(/(\d{2}-\d{2}-\d{4})-+(\d{2}-\d{2}-\d{4})/);
+  return m ? (m[1] + "_" + m[2]) : "";
+}
+
+// Nom de document lisible : type, immeuble, logement, locataire, periode.
+function nomDocument(prefixe, immeuble, apt, locataire, periode, extension) {
+  var nomComplet = NOM_IMMEUBLE_COMPLET[immeuble] || immeuble;
+  var morceaux = [prefixe, cleanPath(nomComplet), cleanPath(apt), cleanPath(locataire)];
+  morceaux.push(periode ? periode : String(new Date().getFullYear()));
+  return morceaux.join("_") + "." + extension;
+}
+
 var MAKE_WEBHOOK = 'https://hook.eu1.make.com/scuukpv6clyyhen8klvyooxnlbs8pwd5';
 
 function envoyer() {
@@ -967,26 +1018,36 @@ function envoyer() {
     function sendToMake(istaB64, istaFilename) {
       // Envoyer les fichiers comme champs séparés
       // Make.com peut ainsi les traiter individuellement
+      // Chemin et noms calcules ICI, puis transmis a Make : la regle reste
+      // dans le code, visible et verifiable, plutot que cachee dans le scenario.
+      var periode = periodeDepuisNomWord(S.wordFile.name);
+      var dossier = cheminArchive(S.imm, loc.apt);
+      var nomWord = nomDocument('Decompte', S.imm, loc.apt, loc.nom, periode, 'docx');
+
       var payload = {
         to: dest,
         subject: subj,
         body: body.replace(/\n/g, '<br>'),
         immeuble: S.imm,
         apt: loc.apt,
+        // dossier relatif, a coller tel quel dans le champ Folder de Make
+        folderPath: dossier,
+        periode: periode,
         // Fichier Word
-        word_filename: S.wordFile.name,
+        word_filename: nomWord,
         word_data: wordB64,
         // Pour Gmail attachments
         attachments: [
-          {filename: S.wordFile.name, data: wordB64}
+          {filename: nomWord, data: wordB64}
         ]
       };
 
       // Ajouter ISTA si PTG
       if (istaB64 && istaFilename) {
-        payload.ista_filename = istaFilename;
+        var nomIsta = nomDocument('ISTA', S.imm, loc.apt, loc.nom, periode, 'pdf');
+        payload.ista_filename = nomIsta;
         payload.ista_data = istaB64;
-        payload.attachments.push({filename: istaFilename, data: istaB64});
+        payload.attachments.push({filename: nomIsta, data: istaB64});
       }
 
       fetch(MAKE_WEBHOOK, {
@@ -996,10 +1057,14 @@ function envoyer() {
       })
       .then(function(r) {
         if (r.ok || r.status === 200) {
-          var archivePath = 'Archives Charges Immeubles/' + S.imm + '/' + loc.apt + '/';
+          var archivePath = DOSSIER_RACINE_DOCUMENTS + ' / ' + dossier.split('/').join(' / ');
           zone.innerHTML =
             '<div class="st ok">✅ Mail envoyé à ' + dest + '</div>' +
-            '<div class="st ok" style="margin-top:6px">📁 Sauvegardé dans OneDrive :<br><span style="font-family:monospace;font-size:11px">' + archivePath + '</span></div>';
+            '<div class="st ok" style="margin-top:6px">📁 Envoyé vers OneDrive :<br><span style="font-family:monospace;font-size:11px">' + archivePath + '</span><br>' +
+            '<span style="font-family:monospace;font-size:11px">' + nomWord + '</span></div>' +
+            (periode ? '' :
+              '<div class="st" style="margin-top:6px;color:#b45309">⚠️ La période n\'a pas pu être lue sur le nom du fichier Word : ' +
+              'les documents portent l\'année seule. Utilisez le fichier tel que Charges &amp; Compteurs le nomme pour avoir la période.</div>');
           btn.innerHTML = '✉️ Envoyer le décompte';
           btn.disabled = false;
           // Réinitialiser les fichiers pour le prochain envoi
