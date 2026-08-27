@@ -91,7 +91,7 @@ input[type=file]{display:none}
   <div style="display:flex;align-items:center;justify-content:space-between">
     <div>
       <h1>📬 Envoi Décomptes</h1>
-      <p>Biche · Nimy · Petite Guirlande</p>
+      <p>Biche · Nimy · Petite Guirlande · <span id="app-version"></span></p>
     </div>
     <button onclick="location.reload()" style="background:none;border:1px solid var(--brd);color:var(--txt2);font-size:13px;cursor:pointer;padding:6px 12px;border-radius:8px">↺ Réinit.</button>
   </div>
@@ -358,6 +358,8 @@ window.onload = function() {
   loadSig();
   buildYears('yt-envoi');
   buildYears('yt-ista');
+  var elVer = document.getElementById('app-version');
+  if (elVer) elVer.textContent = APP_VERSION;
   renderLocs();
   fillSelLoc();
   fillBody();
@@ -1000,6 +1002,10 @@ function nomDocument(prefixe, immeuble, apt, locataire, periode, extension) {
   return morceaux.join("_") + "." + extension;
 }
 
+// Numero de version, affiche en haut de l'ecran. A INCREMENTER a chaque
+// modification : sans lui, impossible de savoir quelle version tourne.
+var APP_VERSION = 'v2';
+
 var MAKE_WEBHOOK = 'https://hook.eu1.make.com/scuukpv6clyyhen8klvyooxnlbs8pwd5';
 
 function envoyer() {
@@ -1065,6 +1071,8 @@ function envoyer() {
             '<div class="st ok">✅ Mail envoyé à ' + dest + '</div>' +
             '<div class="st ok" style="margin-top:6px">📁 Envoyé vers OneDrive :<br><span style="font-family:monospace;font-size:11px">' + archivePath + '</span><br>' +
             '<span style="font-family:monospace;font-size:11px">' + nomWord + '</span></div>' +
+            '<div class="st" style="margin-top:6px;font-family:monospace;font-size:10px;color:#94a3b8">' +
+              'folderPath envoyé : ' + dossier + '</div>' +
             (periode ? '' :
               '<div class="st" style="margin-top:6px;color:#b45309">⚠️ La période n\'a pas pu être lue sur le nom du fichier Word : ' +
               'les documents portent l\'année seule. Utilisez le fichier tel que Charges &amp; Compteurs le nomme pour avoir la période.</div>');
