@@ -364,13 +364,14 @@ window.onload = function() {
   if (elVer) elVer.textContent = APP_VERSION;
 
   // Decomptes ISTA conserves lors d'un decoupage precedent
-  var conserve = relireIsta();
-  if (conserve) {
+  nettoyerAncienStockage();
+  relireIsta().then(function(conserve) {
+    if (!conserve) return;
     S.istaPages = conserve.pages;
     S.istaDecoupeLe = conserve.decoupeLe;
     if (conserve.annee) S.annee = conserve.annee;
     showIstaResults();
-  }
+  });
   renderLocs();
   fillSelLoc();
   fillBody();
@@ -794,93 +795,140 @@ function parseGroupes(pages) {
 }
 
 /* ============================================================================
-   CONSERVATION DES DECOMPTES ISTA DECOUPES
+   CONSERVATION DES DECOMPTES ISTA DECOUPES — IndexedDB
    ----------------------------------------------------------------------------
    Ils ne survivaient pas a un rechargement de page : il fallait reimporter le
-   PDF global et tout redecouper a chaque fois. On les garde maintenant dans la
-   memoire du navigateur. ATTENTION : ce n'est PAS une sauvegarde — cette
-   memoire appartient a ce navigateur, sur cet appareil. L'archivage reste
-   OneDrive.
+   PDF global et tout redecouper a chaque fois.
+
+   POURQUOI PAS localStorage : il ne stocke que du texte, donc chaque PDF y
+   grossit d'un tiers, et son quota (~5 Mo) est PARTAGE avec la liste des
+   locataires et la signature. IndexedDB garde les Blob tels quels et dispose
+   de centaines de Mo.
+
+   ATTENTION : ce n'est PAS une sauvegarde. Cette memoire appartient a ce
+   navigateur, sur cet appareil. L'archivage reste OneDrive.
    ============================================================================ */
 
-var CLE_ISTA = 'istaPages';
+var BASE_NOM = 'envoi-decomptes';
+var BASE_VERSION = 1;
+var MAGASIN = 'ista';
+var CLE_ISTA = 'derniereDecoupe';
 
-// Un Blob ne se stocke pas : on garde le PDF en base64 et on le reconstruit.
-function blobVersBase64(blob) {
+// Ouverture de la base. Toute erreur est REMONTEE, jamais avalee.
+function ouvrirBase() {
   return new Promise(function(resoudre, rejeter) {
-    var lecteur = new FileReader();
-    lecteur.onload = function() { resoudre(String(lecteur.result).split(',')[1]); };
-    lecteur.onerror = rejeter;
-    lecteur.readAsDataURL(blob);
+    if (!window.indexedDB) { rejeter(new Error('Ce navigateur ne propose pas IndexedDB.')); return; }
+    var demande;
+    try { demande = window.indexedDB.open(BASE_NOM, BASE_VERSION); }
+    catch (e) { rejeter(e); return; }
+    demande.onupgradeneeded = function() {
+      var base = demande.result;
+      if (!base.objectStoreNames.contains(MAGASIN)) base.createObjectStore(MAGASIN);
+    };
+    demande.onsuccess = function() { resoudre(demande.result); };
+    demande.onerror = function() { rejeter(demande.error || new Error('Ouverture impossible.')); };
+    demande.onblocked = function() { rejeter(new Error('Base verrouillée par un autre onglet.')); };
   });
 }
 
-function base64VersBlob(b64) {
-  var binaire = atob(b64);
-  var octets = new Uint8Array(binaire.length);
-  for (var i = 0; i < binaire.length; i++) octets[i] = binaire.charCodeAt(i);
-  return new Blob([octets], { type: 'application/pdf' });
+function ecrireBase(cle, valeur) {
+  return ouvrirBase().then(function(base) {
+    return new Promise(function(resoudre, rejeter) {
+      var tr = base.transaction(MAGASIN, 'readwrite');
+      tr.objectStore(MAGASIN).put(valeur, cle);
+      tr.oncomplete = function() { base.close(); resoudre(); };
+      tr.onerror = function() { base.close(); rejeter(tr.error || new Error('Écriture impossible.')); };
+      tr.onabort = function() { base.close(); rejeter(tr.error || new Error('Écriture interrompue.')); };
+    });
+  });
 }
 
+function lireBase(cle) {
+  return ouvrirBase().then(function(base) {
+    return new Promise(function(resoudre, rejeter) {
+      var tr = base.transaction(MAGASIN, 'readonly');
+      var dem = tr.objectStore(MAGASIN).get(cle);
+      dem.onsuccess = function() { base.close(); resoudre(dem.result || null); };
+      dem.onerror = function() { base.close(); rejeter(dem.error || new Error('Lecture impossible.')); };
+    });
+  });
+}
+
+function effacerBase(cle) {
+  return ouvrirBase().then(function(base) {
+    return new Promise(function(resoudre, rejeter) {
+      var tr = base.transaction(MAGASIN, 'readwrite');
+      tr.objectStore(MAGASIN).delete(cle);
+      tr.oncomplete = function() { base.close(); resoudre(); };
+      tr.onerror = function() { base.close(); rejeter(tr.error || new Error('Effacement impossible.')); };
+    });
+  });
+}
+
+// Les Blob sont stockes TELS QUELS : aucun gonflement, aucune conversion.
 function conserverIsta(pages) {
   var enregistrables = pages.map(function(p) {
-    return { nom: p.nom, apt: p.apt, filename: p.filename, b64: p.b64 };
+    return { nom: p.nom, apt: p.apt, filename: p.filename, blob: p.blob };
   });
   var paquet = { annee: S.annee, decoupeLe: new Date().toISOString(), pages: enregistrables };
-  try {
-    localStorage.setItem(CLE_ISTA, JSON.stringify(paquet));
+  return ecrireBase(CLE_ISTA, paquet).then(function() {
     return { ok: true };
-  } catch (e) {
-    // Le quota du navigateur est depasse : on le DIT, on ne fait pas semblant.
-    try { localStorage.removeItem(CLE_ISTA); } catch (e2) {}
-    return { ok: false, message: e && e.name === 'QuotaExceededError'
-      ? 'La mémoire du navigateur est pleine : les décomptes ne seront pas conservés après fermeture.'
+  }).catch(function(e) {
+    // On le DIT plutot que de faire semblant d'avoir reussi.
+    var pleine = e && (e.name === 'QuotaExceededError' || /quota/i.test(String(e.message || '')));
+    return { ok: false, message: pleine
+      ? 'La mémoire de l\'appareil est pleine : les décomptes ne seront pas conservés après fermeture.'
       : 'Les décomptes n\'ont pas pu être conservés (' + (e && e.message ? e.message : 'raison inconnue') + ').' };
-  }
+  });
 }
 
 function relireIsta() {
-  var brut;
-  try { brut = localStorage.getItem(CLE_ISTA); } catch (e) { return null; }
-  if (!brut) return null;
-  var paquet;
-  try { paquet = JSON.parse(brut); } catch (e) { return null; }
-  if (!paquet || !Array.isArray(paquet.pages) || !paquet.pages.length) return null;
-  var pages = [];
-  for (var i = 0; i < paquet.pages.length; i++) {
-    var p = paquet.pages[i];
-    if (!p || !p.b64) continue;
-    try {
-      pages.push({ nom: p.nom, apt: p.apt, filename: p.filename, b64: p.b64, blob: base64VersBlob(p.b64) });
-    } catch (e) { /* une entree abimee ne doit pas faire perdre les autres */ }
-  }
-  if (!pages.length) return null;
-  return { annee: paquet.annee, decoupeLe: paquet.decoupeLe, pages: pages };
+  return lireBase(CLE_ISTA).then(function(paquet) {
+    if (!paquet || !Array.isArray(paquet.pages) || !paquet.pages.length) return null;
+    var pages = [];
+    for (var i = 0; i < paquet.pages.length; i++) {
+      var p = paquet.pages[i];
+      // une entree abimee ne doit pas faire perdre les autres
+      if (p && p.blob && p.filename) pages.push({ nom: p.nom, apt: p.apt, filename: p.filename, blob: p.blob });
+    }
+    if (!pages.length) return null;
+    return { annee: paquet.annee, decoupeLe: paquet.decoupeLe, pages: pages };
+  }).catch(function() { return null; });
 }
 
 function oublierIsta() {
   if (!window.confirm('Effacer les ' + S.istaPages.length + ' décomptes ISTA conservés ? '
     + 'Vous devrez réimporter le PDF global pour les retrouver.')) return;
-  try { localStorage.removeItem(CLE_ISTA); } catch (e) {}
-  S.istaPages = [];
-  S.istaFile = null;
-  S.istaDecoupeLe = null;
-  var sub = document.getElementById('ista-sub');
-  if (sub) sub.textContent = 'Sélectionner le PDF ISTA';
-  var okEl = document.getElementById('ista-ok');
-  if (okEl) okEl.textContent = '⬜';
-  checkSend();
-  document.getElementById('ista-res').innerHTML = '';
+  effacerBase(CLE_ISTA).catch(function() {}).then(function() {
+    S.istaPages = [];
+    S.istaFile = null;
+    S.istaDecoupeLe = null;
+    S.istaAvertissement = null;
+    var sub = document.getElementById('ista-sub');
+    if (sub) sub.textContent = 'Sélectionner le PDF ISTA';
+    var okEl = document.getElementById('ista-ok');
+    if (okEl) okEl.textContent = '⬜';
+    checkSend();
+    document.getElementById('ista-res').innerHTML = '';
+  });
+}
+
+// Ancienne conservation en localStorage (v4) : on la nettoie une fois pour
+// toutes, elle occupait de la place pour rien.
+function nettoyerAncienStockage() {
+  try { localStorage.removeItem('istaPages'); } catch (e) {}
 }
 
 function genPDFs(pdf, groupes, idx, results) {
   if (idx >= groupes.length) {
     S.istaPages = results;
     S.istaDecoupeLe = new Date().toISOString();
-    var r = conserverIsta(results);
-    S.istaAvertissement = r.ok ? null : r.message;
     document.getElementById('ista-prog').style.display = 'none';
     showIstaResults();
+    conserverIsta(results).then(function(r) {
+      S.istaAvertissement = r.ok ? null : r.message;
+      showIstaResults();   // on reaffiche pour montrer un eventuel avertissement
+    });
     return;
   }
   setProg(50 + idx / groupes.length * 50);
@@ -889,13 +937,8 @@ function genPDFs(pdf, groupes, idx, results) {
     var safeName = g.nom.replace(/[^a-zA-ZÀ-ÿ0-9\s&]/g,'').replace(/\s+/g,'_').substring(0,35);
     var safeApt = g.apt.replace(/[^a-zA-Z0-9]/g,'_');
     var nomFichier = 'ISTA_'+S.annee+'_'+safeApt+'_'+safeName+'.pdf';
-    blobVersBase64(blob).then(function(b64) {
-      results.push({nom:g.nom, apt:g.apt, blob:blob, b64:b64, filename:nomFichier});
-      genPDFs(pdf, groupes, idx+1, results);
-    }).catch(function() {
-      results.push({nom:g.nom, apt:g.apt, blob:blob, b64:null, filename:nomFichier});
-      genPDFs(pdf, groupes, idx+1, results);
-    });
+    results.push({nom:g.nom, apt:g.apt, blob:blob, filename:nomFichier});
+    genPDFs(pdf, groupes, idx+1, results);
   });
 }
 
@@ -1132,7 +1175,7 @@ function nomDocument(prefixe, immeuble, apt, locataire, periode, extension) {
 
 // Numero de version, affiche en haut de l'ecran. A INCREMENTER a chaque
 // modification : sans lui, impossible de savoir quelle version tourne.
-var APP_VERSION = 'v4';
+var APP_VERSION = 'v5';
 
 var MAKE_WEBHOOK = 'https://hook.eu1.make.com/scuukpv6clyyhen8klvyooxnlbs8pwd5';
 
