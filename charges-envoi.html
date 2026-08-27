@@ -1173,7 +1173,10 @@ function fillObj() {
 function fillBody() {
   var periode = getPeriodeLabel();
   document.getElementById('mail-body').value =
-    'Bonjour,\n\nVeuillez trouver ci-joint votre décompte de charges ' + periode + '.\n\nN\'hésitez pas à me contacter pour toute question.\n\n' + S.sig;
+    'Bonjour,\n\nVeuillez trouver ci-joint votre décompte de charges ' + periode + '.\n\n'
+    + 'Pour une lecture correcte du tableau, ouvrez la pièce jointe avec Word. '
+    + 'L\'aperçu de votre messagerie peut comprimer les colonnes.\n\n'
+    + 'N\'hésitez pas à me contacter pour toute question.\n\n' + S.sig;
 }
 
 function checkSend() {
@@ -1228,16 +1231,23 @@ function periodeDepuisNomWord(nomFichier) {
 }
 
 // Nom de document lisible : type, immeuble, logement, locataire, periode.
-function nomDocument(prefixe, immeuble, apt, locataire, periode, extension) {
+// L'heure de l'envoi, sur quatre chiffres : « 2246 » pour 22h46.
+function heureEnvoi() {
+  var d = new Date();
+  return ("0" + d.getHours()).slice(-2) + ("0" + d.getMinutes()).slice(-2);
+}
+
+function nomDocument(prefixe, immeuble, apt, locataire, periode, extension, heure) {
   var nomComplet = NOM_IMMEUBLE_COMPLET[immeuble] || immeuble;
   var morceaux = [prefixe, cleanPath(nomComplet), cleanPath(apt), cleanPath(locataire)];
   morceaux.push(periode ? periode : String(new Date().getFullYear()));
+  if (heure) morceaux.push(heure);
   return morceaux.join("_") + "." + extension;
 }
 
 // Numero de version, affiche en haut de l'ecran. A INCREMENTER a chaque
 // modification : sans lui, impossible de savoir quelle version tourne.
-var APP_VERSION = 'v6';
+var APP_VERSION = 'v7';
 
 var MAKE_WEBHOOK = 'https://hook.eu1.make.com/scuukpv6clyyhen8klvyooxnlbs8pwd5';
 
@@ -1264,10 +1274,13 @@ function envoyer() {
       // dans le code, visible et verifiable, plutot que cachee dans le scenario.
       var periode = periodeDepuisNomWord(S.wordFile.name);
       var dossier = cheminArchive(S.imm, loc.apt);
+      // UNE SEULE fois pour les deux documents : sinon un envoi a cheval sur
+      // une minute leur donnerait deux heures differentes.
+      var heure = heureEnvoi();
       // On garde l'extension REELLE du fichier, jamais une extension imposee :
       // un document mal nomme est un document que personne ne peut ouvrir.
       var extensionWord = S.wordType || (S.wordFile.name.split('.').pop() || 'docx').toLowerCase();
-      var nomWord = nomDocument('Decompte', S.imm, loc.apt, loc.nom, periode, extensionWord);
+      var nomWord = nomDocument('Decompte', S.imm, loc.apt, loc.nom, periode, extensionWord, heure);
 
       var payload = {
         to: dest,
@@ -1289,7 +1302,7 @@ function envoyer() {
 
       // Ajouter ISTA si PTG
       if (istaB64 && istaFilename) {
-        var nomIsta = nomDocument('ISTA', S.imm, loc.apt, loc.nom, periode, 'pdf');
+        var nomIsta = nomDocument('ISTA', S.imm, loc.apt, loc.nom, periode, 'pdf', heure);
         payload.ista_filename = nomIsta;
         payload.ista_data = istaB64;
         payload.attachments.push({filename: nomIsta, data: istaB64});
