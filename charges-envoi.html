@@ -341,6 +341,8 @@ var S = {
   annee: (function() { var m = new Date().getMonth(); var y = new Date().getFullYear(); return m >= 8 ? y + '-' + (y+1) : (y-1) + '-' + y; })(),
   locs: [],
   istaPages: [],
+  istaDecoupeLe: null,
+  istaAvertissement: null,
   selLoc: null,
   wordFile: null,
   istaFile: null,
@@ -360,6 +362,15 @@ window.onload = function() {
   buildYears('yt-ista');
   var elVer = document.getElementById('app-version');
   if (elVer) elVer.textContent = APP_VERSION;
+
+  // Decomptes ISTA conserves lors d'un decoupage precedent
+  var conserve = relireIsta();
+  if (conserve) {
+    S.istaPages = conserve.pages;
+    S.istaDecoupeLe = conserve.decoupeLe;
+    if (conserve.annee) S.annee = conserve.annee;
+    showIstaResults();
+  }
   renderLocs();
   fillSelLoc();
   fillBody();
@@ -782,9 +793,92 @@ function parseGroupes(pages) {
   return groupes;
 }
 
+/* ============================================================================
+   CONSERVATION DES DECOMPTES ISTA DECOUPES
+   ----------------------------------------------------------------------------
+   Ils ne survivaient pas a un rechargement de page : il fallait reimporter le
+   PDF global et tout redecouper a chaque fois. On les garde maintenant dans la
+   memoire du navigateur. ATTENTION : ce n'est PAS une sauvegarde — cette
+   memoire appartient a ce navigateur, sur cet appareil. L'archivage reste
+   OneDrive.
+   ============================================================================ */
+
+var CLE_ISTA = 'istaPages';
+
+// Un Blob ne se stocke pas : on garde le PDF en base64 et on le reconstruit.
+function blobVersBase64(blob) {
+  return new Promise(function(resoudre, rejeter) {
+    var lecteur = new FileReader();
+    lecteur.onload = function() { resoudre(String(lecteur.result).split(',')[1]); };
+    lecteur.onerror = rejeter;
+    lecteur.readAsDataURL(blob);
+  });
+}
+
+function base64VersBlob(b64) {
+  var binaire = atob(b64);
+  var octets = new Uint8Array(binaire.length);
+  for (var i = 0; i < binaire.length; i++) octets[i] = binaire.charCodeAt(i);
+  return new Blob([octets], { type: 'application/pdf' });
+}
+
+function conserverIsta(pages) {
+  var enregistrables = pages.map(function(p) {
+    return { nom: p.nom, apt: p.apt, filename: p.filename, b64: p.b64 };
+  });
+  var paquet = { annee: S.annee, decoupeLe: new Date().toISOString(), pages: enregistrables };
+  try {
+    localStorage.setItem(CLE_ISTA, JSON.stringify(paquet));
+    return { ok: true };
+  } catch (e) {
+    // Le quota du navigateur est depasse : on le DIT, on ne fait pas semblant.
+    try { localStorage.removeItem(CLE_ISTA); } catch (e2) {}
+    return { ok: false, message: e && e.name === 'QuotaExceededError'
+      ? 'La mémoire du navigateur est pleine : les décomptes ne seront pas conservés après fermeture.'
+      : 'Les décomptes n\'ont pas pu être conservés (' + (e && e.message ? e.message : 'raison inconnue') + ').' };
+  }
+}
+
+function relireIsta() {
+  var brut;
+  try { brut = localStorage.getItem(CLE_ISTA); } catch (e) { return null; }
+  if (!brut) return null;
+  var paquet;
+  try { paquet = JSON.parse(brut); } catch (e) { return null; }
+  if (!paquet || !Array.isArray(paquet.pages) || !paquet.pages.length) return null;
+  var pages = [];
+  for (var i = 0; i < paquet.pages.length; i++) {
+    var p = paquet.pages[i];
+    if (!p || !p.b64) continue;
+    try {
+      pages.push({ nom: p.nom, apt: p.apt, filename: p.filename, b64: p.b64, blob: base64VersBlob(p.b64) });
+    } catch (e) { /* une entree abimee ne doit pas faire perdre les autres */ }
+  }
+  if (!pages.length) return null;
+  return { annee: paquet.annee, decoupeLe: paquet.decoupeLe, pages: pages };
+}
+
+function oublierIsta() {
+  if (!window.confirm('Effacer les ' + S.istaPages.length + ' décomptes ISTA conservés ? '
+    + 'Vous devrez réimporter le PDF global pour les retrouver.')) return;
+  try { localStorage.removeItem(CLE_ISTA); } catch (e) {}
+  S.istaPages = [];
+  S.istaFile = null;
+  S.istaDecoupeLe = null;
+  var sub = document.getElementById('ista-sub');
+  if (sub) sub.textContent = 'Sélectionner le PDF ISTA';
+  var okEl = document.getElementById('ista-ok');
+  if (okEl) okEl.textContent = '⬜';
+  checkSend();
+  document.getElementById('ista-res').innerHTML = '';
+}
+
 function genPDFs(pdf, groupes, idx, results) {
   if (idx >= groupes.length) {
     S.istaPages = results;
+    S.istaDecoupeLe = new Date().toISOString();
+    var r = conserverIsta(results);
+    S.istaAvertissement = r.ok ? null : r.message;
     document.getElementById('ista-prog').style.display = 'none';
     showIstaResults();
     return;
@@ -794,8 +888,14 @@ function genPDFs(pdf, groupes, idx, results) {
   genOnePDF(pdf, g.nums).then(function(blob) {
     var safeName = g.nom.replace(/[^a-zA-ZÀ-ÿ0-9\s&]/g,'').replace(/\s+/g,'_').substring(0,35);
     var safeApt = g.apt.replace(/[^a-zA-Z0-9]/g,'_');
-    results.push({nom:g.nom, apt:g.apt, blob:blob, filename:'ISTA_'+S.annee+'_'+safeApt+'_'+safeName+'.pdf'});
-    genPDFs(pdf, groupes, idx+1, results);
+    var nomFichier = 'ISTA_'+S.annee+'_'+safeApt+'_'+safeName+'.pdf';
+    blobVersBase64(blob).then(function(b64) {
+      results.push({nom:g.nom, apt:g.apt, blob:blob, b64:b64, filename:nomFichier});
+      genPDFs(pdf, groupes, idx+1, results);
+    }).catch(function() {
+      results.push({nom:g.nom, apt:g.apt, blob:blob, b64:null, filename:nomFichier});
+      genPDFs(pdf, groupes, idx+1, results);
+    });
   });
 }
 
@@ -852,8 +952,18 @@ function showIstaResults() {
     rows += '</div></div>';
   }
   var path = 'AGestion Charges/' + S.annee + '/PTG/ISTA/Relevé annuel/';
+  var quand = '';
+  if (S.istaDecoupeLe) {
+    var d = new Date(S.istaDecoupeLe);
+    quand = ' — découpés le ' + ('0'+d.getDate()).slice(-2) + '/' + ('0'+(d.getMonth()+1)).slice(-2)
+          + '/' + d.getFullYear() + ' à ' + ('0'+d.getHours()).slice(-2) + 'h' + ('0'+d.getMinutes()).slice(-2);
+  }
   document.getElementById('ista-res').innerHTML =
-    '<div class="st ok">✅ ' + S.istaPages.length + ' décomptes générés</div>' +
+    '<div class="st ok">✅ ' + S.istaPages.length + ' décomptes disponibles' + quand + '</div>' +
+    (S.istaAvertissement
+      ? '<div class="st wa">⚠️ ' + S.istaAvertissement + '</div>'
+      : '<div class="st" style="font-size:12px;color:var(--txt2)">Ils restent disponibles à la prochaine ouverture : ' +
+        'inutile de réimporter le PDF global. Cette mémoire appartient à cet appareil — ce n\'est pas une sauvegarde.</div>') +
     '<div class="card"><div class="ct">Locataires détectés</div>' +
     '<div style="font-size:12px;color:var(--txt2);margin-bottom:8px;line-height:1.5">' +
     '<b>Choisir</b> sélectionne ce décompte pour l\'envoi et revient à l\'écran Envoyer. ' +
@@ -862,7 +972,8 @@ function showIstaResults() {
     '<div class="card" style="background:rgba(79,110,247,.08);border-color:rgba(79,110,247,.3)">' +
     '<div style="font-size:12px;color:var(--txt2)">📁 Sauvegarde OneDrive :</div>' +
     '<div style="font-family:monospace;font-size:11px;color:var(--acc);margin:6px 0">' + path + '</div>' +
-    '<button class="btn bp" onclick="saveAllIsta()">💾 Sauvegarder tous dans OneDrive</button></div>';
+    '<button class="btn bp" onclick="saveAllIsta()">💾 Sauvegarder tous dans OneDrive</button></div>' +
+    '<div class="card"><button class="btn bs" onclick="oublierIsta()">🗑 Effacer les décomptes conservés</button></div>';
 }
 
 // Choisir ce decompte pour l'envoi, puis revenir a l'ecran Envoyer : c'est
@@ -1021,7 +1132,7 @@ function nomDocument(prefixe, immeuble, apt, locataire, periode, extension) {
 
 // Numero de version, affiche en haut de l'ecran. A INCREMENTER a chaque
 // modification : sans lui, impossible de savoir quelle version tourne.
-var APP_VERSION = 'v3';
+var APP_VERSION = 'v4';
 
 var MAKE_WEBHOOK = 'https://hook.eu1.make.com/scuukpv6clyyhen8klvyooxnlbs8pwd5';
 
