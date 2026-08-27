@@ -654,7 +654,7 @@ function onWord(input) {
   if (!input.files[0]) return;
   S.wordFile = input.files[0];
   document.getElementById('word-sub').textContent = S.wordFile.name;
-  document.getElementById('word-path').textContent = '📁 ' + DOSSIER_RACINE_DOCUMENTS + ' › ' + cheminArchive(S.imm, (S.selLoc && S.selLoc.apt) || '').split('/').join(' › ');
+  document.getElementById('word-path').textContent = '📁 ' + DOSSIER_RACINE_DOCUMENTS + ' › ' + cheminArchive(S.imm, (S.selLoc && S.selLoc.apt) || '').replace(/^\//, '').split('/').join(' › ');
   document.getElementById('word-ok').textContent = '✅';
   checkSend();
 }
@@ -974,11 +974,14 @@ var NOM_IMMEUBLE_COMPLET = {
 // Dossier racine configure dans le module OneDrive du scenario Make.
 var DOSSIER_RACINE_DOCUMENTS = "SAUVEGARDE DECOMPTES";
 
-// Chemin RELATIF envoye a Make : annee / immeuble / logement.
+// Chemin RELATIF envoye a Make : / annee / immeuble / logement.
+// La barre oblique de tete est VOLONTAIRE : le champ Folder du module OneDrive
+// se contente alors de « /SAUVEGARDE DECOMPTES{{1.folderPath}} », sans qu'il
+// faille en ajouter une au milieu — l'editeur de Make ne la conserve pas.
 function cheminArchive(immeuble, apt) {
   var annee = String(new Date().getFullYear());
   var nomComplet = NOM_IMMEUBLE_COMPLET[immeuble] || immeuble;
-  return annee + "/" + cleanPath(nomComplet) + "/" + cleanPath(apt);
+  return "/" + annee + "/" + cleanPath(nomComplet) + "/" + cleanPath(apt);
 }
 
 // La periode se lit sur le nom du fichier Word produit par Charges &
@@ -1057,7 +1060,7 @@ function envoyer() {
       })
       .then(function(r) {
         if (r.ok || r.status === 200) {
-          var archivePath = DOSSIER_RACINE_DOCUMENTS + ' / ' + dossier.split('/').join(' / ');
+          var archivePath = DOSSIER_RACINE_DOCUMENTS + ' / ' + dossier.replace(/^\//, '').split('/').join(' / ');
           zone.innerHTML =
             '<div class="st ok">✅ Mail envoyé à ' + dest + '</div>' +
             '<div class="st ok" style="margin-top:6px">📁 Envoyé vers OneDrive :<br><span style="font-family:monospace;font-size:11px">' + archivePath + '</span><br>' +
