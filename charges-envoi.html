@@ -492,19 +492,19 @@ function onSelLoc() {
   var ez = document.getElementById('email-zone');
   if (S.selLoc) {
     ez.style.display = 'block';
-    if (S.selLoc.email) {
-      var html = '<div class="st ok" style="flex-direction:column;align-items:flex-start;gap:4px">';
-      html += '<div><strong>Locataire :</strong> ' + S.selLoc.email + '</div>';
-      if (S.selLoc.garant) {
-        html += '<div><strong>Garant :</strong> ' + S.selLoc.garant + '</div>';
-      } else {
-        html += '<div style="color:var(--txt2);font-size:12px">Pas de garant</div>';
-      }
-      html += '</div>';
-      ez.innerHTML = html;
-    } else {
-      ez.innerHTML = '<div class="st wa">⚠️ Email manquant — modifier dans Locataires</div>';
-    }
+    var html = '<div class="f"><label>Adresse du locataire</label>'
+      + '<input type="email" id="edit-email" inputmode="email" autocapitalize="off" spellcheck="false"'
+      + ' placeholder="nom@exemple.be" value="' + echapper(S.selLoc.email || '') + '"'
+      + ' onchange="majAdresse(\'email\', this.value)" onblur="majAdresse(\'email\', this.value)"></div>'
+      + '<div class="f"><label>Adresse du garant (facultative)</label>'
+      + '<input type="email" id="edit-garant" inputmode="email" autocapitalize="off" spellcheck="false"'
+      + ' placeholder="aucun garant" value="' + echapper(S.selLoc.garant || '') + '"'
+      + ' onchange="majAdresse(\'garant\', this.value)" onblur="majAdresse(\'garant\', this.value)"></div>'
+      + '<div id="edit-email-msg" style="font-size:12px;color:var(--txt2);line-height:1.5">'
+      + (S.selLoc.email ? 'Toute correction est conservée pour les envois suivants.'
+                        : '⚠️ Aucune adresse : l\'envoi restera bloqué tant qu\'elle est vide.')
+      + '</div>';
+    ez.innerHTML = html;
     fillObj();
     fillBody();
   } else {
@@ -1179,6 +1179,44 @@ function fillBody() {
     + 'N\'hésitez pas à me contacter pour toute question.\n\n' + S.sig;
 }
 
+// Echappe une valeur avant de l'inserer dans un attribut HTML : sans cela,
+// une apostrophe ou un guillemet dans une adresse casserait le champ.
+function echapper(v) {
+  return String(v === null || v === undefined ? '' : v)
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Corrige l'adresse depuis l'ecran d'envoi et la CONSERVE dans la fiche du
+// locataire, comme si elle avait ete modifiee dans l'onglet Locataires.
+function majAdresse(champ, valeur) {
+  if (!S.selLoc) return;
+  var v = String(valeur || '').trim();
+  var msg = document.getElementById('edit-email-msg');
+
+  if (v && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(v)) {
+    if (msg) { msg.textContent = '⚠️ Cette adresse ne ressemble pas à une adresse valable — non enregistrée.'; msg.style.color = '#b45309'; }
+    return;
+  }
+  if (champ === 'email' && !v) {
+    if (msg) { msg.textContent = '⚠️ Aucune adresse : l\'envoi restera bloqué tant qu\'elle est vide.'; msg.style.color = '#b45309'; }
+    S.selLoc.email = '';
+  } else {
+    S.selLoc[champ] = v;
+    if (msg) {
+      msg.textContent = '✓ Adresse enregistrée pour ce locataire, elle servira aux prochains envois.';
+      msg.style.color = 'var(--grn)';
+    }
+  }
+  // on repercute dans la liste conservee, pas seulement dans la copie affichee
+  for (var i = 0; i < S.locs.length; i++) {
+    if (S.locs[i].id === S.selLoc.id) { S.locs[i][champ] = S.selLoc[champ]; break; }
+  }
+  saveData();
+  renderLocs();
+  checkSend();
+}
+
 function checkSend() {
   var ok = S.selLoc && S.selLoc.email && S.wordFile && (S.imm !== 'PTG' || S.istaFile);
   document.getElementById('btn-send').disabled = !ok;
@@ -1247,7 +1285,7 @@ function nomDocument(prefixe, immeuble, apt, locataire, periode, extension, heur
 
 // Numero de version, affiche en haut de l'ecran. A INCREMENTER a chaque
 // modification : sans lui, impossible de savoir quelle version tourne.
-var APP_VERSION = 'v7';
+var APP_VERSION = 'v8';
 
 var MAKE_WEBHOOK = 'https://hook.eu1.make.com/scuukpv6clyyhen8klvyooxnlbs8pwd5';
 
